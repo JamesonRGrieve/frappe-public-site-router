@@ -9,9 +9,10 @@ import unittest
 import frappe
 from frappe.tests.utils import FrappeTestCase
 from werkzeug.test import EnvironBuilder
-from werkzeug.wrappers import Request
+from werkzeug.wrappers import Request, Response
 
 from public_site_router.router import (
+	clean_redirect,
 	clear_site_map,
 	get_request_site,
 	get_request_store,
@@ -133,6 +134,51 @@ class TestPublicSiteRouting(FrappeTestCase):
 	def test_bad_prefix_rejected(self):
 		with self.assertRaises(frappe.ValidationError):
 			make_site("_Test Bad Prefix Site", "two/segments", ["bad.test"])
+
+	def test_web_form_and_sub_pages_map_into_site_prefix(self):
+		if not frappe.db.exists("Web Form", {"route": "zx/contact"}):
+			frappe.get_doc(
+				{
+					"doctype": "Web Form",
+					"title": "_Test ZX Contact",
+					"route": "zx/contact",
+					"doc_type": "ToDo",
+					"module": "Website",
+					"published": 1,
+					"web_form_fields": [{"fieldname": "description", "fieldtype": "Text", "label": "Description"}],
+				}
+			).insert()
+		on_host("zephyrex.test")
+		self.assertEqual(resolve_path("contact"), "zx/contact")
+		self.assertEqual(resolve_path("contact/new"), "zx/contact/new")
+		on_host("3shub.test")
+		self.assertNotEqual(resolve_path("contact/new"), "zx/contact/new")
+
+	def test_redirect_to_own_prefix_is_cleaned(self):
+		on_host("www.zephyrex.test")
+		for location, expected in (
+			("/zx/contact/new", "/contact/new"),
+			("/zx/contact/new?key=abc", "/contact/new?key=abc"),
+			("/zx/home", "/"),
+			("/zx", "/"),
+			("https://www.zephyrex.test/zx/contact/new", "https://www.zephyrex.test/contact/new"),
+			("https://3shub.test/zx/contact/new", "https://3shub.test/zx/contact/new"),
+			("/zxother/page", "/zxother/page"),
+			("/login", "/login"),
+		):
+			response = Response(status=302, headers={"Location": location})
+			clean_redirect(response, frappe.local.request)
+			self.assertEqual(response.headers["Location"], expected)
+
+	def test_redirect_untouched_off_site_or_not_redirect(self):
+		on_host("erp.example.test")
+		response = Response(status=302, headers={"Location": "/zx/contact/new"})
+		clean_redirect(response, frappe.local.request)
+		self.assertEqual(response.headers["Location"], "/zx/contact/new")
+		on_host("zephyrex.test")
+		response = Response(status=201, headers={"Location": "/zx/contact/new"})
+		clean_redirect(response, frappe.local.request)
+		self.assertEqual(response.headers["Location"], "/zx/contact/new")
 
 	def test_no_store_without_webshop_store(self):
 		on_host("zephyrex.test")

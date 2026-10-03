@@ -17,5 +17,8 @@ required_apps = ["frappe"]
 # website_path_resolver; router.resolve_path then calls those handlers itself.
 website_path_resolver = "public_site_router.router.resolve_path"
 
+# Rewrites a redirect to a site's prefixed route into its clean URL on that site's hosts.
+after_request = ["public_site_router.router.clean_redirect"]
+
 # Answers the frappe-webshop fork's multi-store hook: which Webshop Store serves this request.
 webshop_store_resolver = "public_site_router.router.get_request_store"

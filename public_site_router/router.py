@@ -4,7 +4,9 @@
 Each ``Public Site`` owns a set of host names and a route prefix. On one of its hosts:
 
 * ``/`` serves the page routed ``<prefix>/<home_route>``;
-* ``/<path>`` serves the page routed ``<prefix>/<path>`` when one exists;
+* ``/<path>`` serves the page routed ``<prefix>/<path>`` when one exists (a Web Page or
+  Builder Page, or a Web Form and its sub-pages), and a redirect to ``/<prefix>/<path>``
+  is sent to ``/<path>`` instead;
 * any path whose first segment is a site prefix (its own or another's) is a 404, so a
   site's pages are reachable only through its own clean URLs;
 * anything else (assets, API, login, webshop cart and product routes, global pages)
@@ -15,12 +17,14 @@ Hosts that belong to no Public Site (e.g. the ERP's own host) are not rewritten.
 Rendered pages are cached by endpoint, and endpoints are host-specific here, so one
 site's cached HTML is never served on another site's host."""
 
+from urllib.parse import urlsplit, urlunsplit
+
 import frappe
 from frappe.website.path_resolver import resolve_path as frappe_resolve_path
 
 SITE_MAP_CACHE_KEY = "public_site_router_site_map"
 OWN_RESOLVER = "public_site_router.router.resolve_path"
-ROUTED_DOCTYPES = ("Web Page", "Web Form", "Builder Page")
+ROUTED_DOCTYPES = ("Web Page", "Builder Page")
 
 
 def normalize_host(host):
@@ -76,7 +80,15 @@ def page_exists(route):
 	for doctype in ROUTED_DOCTYPES:
 		if frappe.db.table_exists(doctype) and frappe.db.exists(doctype, {"route": route, "published": 1}):
 			return True
-	return False
+	return is_web_form_route(route)
+
+
+def is_web_form_route(route):
+	"""A published Web Form's own route or one of its sub-pages (new, list, <name>, <name>/edit)."""
+	return any(
+		route == form_route or route.startswith(f"{form_route}/")
+		for form_route in frappe.get_all("Web Form", filters={"published": 1}, pluck="route")
+	)
 
 
 def site_endpoint(site, path, prefixes):
@@ -95,6 +107,32 @@ def resolve_path(path):
 	if site:
 		path = site_endpoint(site, path, get_site_map()["prefixes"]) or path
 	return resolve_with_other_resolvers(path)
+
+
+def clean_location(site, location):
+	"""``location`` with ``site``'s own route prefix removed, so it names the clean URL."""
+	url = urlsplit(location)
+	if url.netloc and normalize_host(url.netloc) != get_request_host():
+		return location
+	prefix = f"/{site.route_prefix}"
+	if url.path == f"{prefix}/{site.home_route}":
+		path = "/"
+	elif url.path == prefix or url.path.startswith(f"{prefix}/"):
+		path = url.path[len(prefix) :] or "/"
+	else:
+		return location
+	return urlunsplit(url._replace(path=path))
+
+
+def clean_redirect(response, request):
+	"""after_request hook: pages that redirect to their own route (a Web Form sends ``/<route>``
+	to ``/<route>/new``) name the prefixed endpoint, which is a 404 on the site's hosts."""
+	location = response.headers.get("Location")
+	if not location or not 300 <= response.status_code < 400:
+		return
+	site = get_request_site()
+	if site:
+		response.headers["Location"] = clean_location(site, location)
 
 
 def resolve_with_other_resolvers(path):

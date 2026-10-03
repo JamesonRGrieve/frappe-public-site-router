@@ -31,6 +31,10 @@ def get_site_map():
 	"""{"hosts": {host: site}, "prefixes": {prefix: site}} for every enabled Public Site."""
 
 	def build():
+		# Installed but not yet migrated (hooks live, tables absent): route nothing rather
+		# than fail every web request. Not cached, so the map appears once migrate runs.
+		if not frappe.db.table_exists("Public Site"):
+			return None
 		enabled = frappe.get_all("Public Site", filters={"enabled": 1}, fields=["name", "route_prefix"])
 		names = {s.name for s in enabled}
 		domains = frappe.get_all(
@@ -43,7 +47,7 @@ def get_site_map():
 			"prefixes": {s.route_prefix: s.name for s in enabled},
 		}
 
-	return frappe.cache.get_value(SITE_MAP_CACHE_KEY, build)
+	return frappe.cache.get_value(SITE_MAP_CACHE_KEY, build) or {"hosts": {}, "prefixes": {}}
 
 
 def clear_site_map():

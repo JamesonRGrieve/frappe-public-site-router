@@ -1,0 +1,120 @@
+{
+ "actions": [],
+ "autoname": "field:site_name",
+ "creation": "2026-10-03 12:00:00.000000",
+ "description": "One business's public website on this Frappe site. Requests on its domains see only its pages: / is its home page, /<path> is the page routed <route prefix>/<path>, and every other site's prefix is a 404. Shared routes (assets, API, login, webshop cart) pass through.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "site_name",
+  "enabled",
+  "company",
+  "column_break_site",
+  "route_prefix",
+  "home_route",
+  "webshop_store",
+  "domains_section",
+  "domains"
+ ],
+ "fields": [
+  {
+   "fieldname": "site_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Site Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Enabled"
+  },
+  {
+   "description": "The business this website belongs to.",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "fieldname": "column_break_site",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "First route segment this site's pages live under, e.g. zx: the page routed zx/about serves zephyrex.ca/about.",
+   "fieldname": "route_prefix",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Route Prefix",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "default": "home",
+   "description": "Route (under the prefix) of the page served at /.",
+   "fieldname": "home_route",
+   "fieldtype": "Data",
+   "label": "Home Route",
+   "reqd": 1
+  },
+  {
+   "description": "Name of the Webshop Store (frappe-webshop fork) that sells on this site, if any.",
+   "fieldname": "webshop_store",
+   "fieldtype": "Data",
+   "label": "Webshop Store"
+  },
+  {
+   "fieldname": "domains_section",
+   "fieldtype": "Section Break",
+   "label": "Domains"
+  },
+  {
+   "fieldname": "domains",
+   "fieldtype": "Table",
+   "label": "Domains",
+   "options": "Public Site Domain",
+   "reqd": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-03 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Public Site Router",
+ "name": "Public Site",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Website Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

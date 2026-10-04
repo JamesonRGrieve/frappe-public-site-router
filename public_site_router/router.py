@@ -9,10 +9,14 @@ Each ``Public Site`` owns a set of host names and a route prefix. On one of its 
   is sent to ``/<path>`` instead;
 * any path whose first segment is a site prefix (its own or another's) is a 404, so a
   site's pages are reachable only through its own clean URLs;
-* anything else (assets, API, login, webshop cart and product routes, global pages)
-  passes through unchanged.
+* a few technical pages (404/error/message, robots.txt, website_script.js) pass through
+  everywhere; account, portal and webshop routes (login, cart, listing, product and item-group
+  pages) pass through only on a site with a Webshop Store;
+* anything else (ERPNext's generic about/contact pages, desk, the global sitemap, other
+  pages) is a 404, so a site shows nothing it did not publish.
 
-Hosts that belong to no Public Site (e.g. the ERP's own host) are not rewritten.
+Static files and the API are not website routes and are never affected. Hosts that belong to
+no Public Site (e.g. the ERP's own host) are not rewritten.
 
 Rendered pages are cached by endpoint, and endpoints are host-specific here, so one
 site's cached HTML is never served on another site's host."""
@@ -25,6 +29,27 @@ from frappe.website.path_resolver import resolve_path as frappe_resolve_path
 SITE_MAP_CACHE_KEY = "public_site_router_site_map"
 OWN_RESOLVER = "public_site_router.router.resolve_path"
 ROUTED_DOCTYPES = ("Web Page", "Builder Page")
+# Website routes every Public Site host serves besides its own pages.
+TECHNICAL_ROUTES = frozenset({"404", "error", "message", "robots.txt", "website_script.js"})
+# Website routes served only on a site with a Webshop Store: customer account + portal pages
+# and the webshop's own pages (first path segment). Item/Item Group pages are matched by route.
+STORE_ACCOUNT_ROUTES = frozenset(
+	{
+		"login",
+		"logout",
+		"update-password",
+		"complete_signup",
+		"me",
+		"orders",
+		"quotations",
+		"invoices",
+		"addresses",
+	}
+)
+STORE_PAGE_SEGMENTS = frozenset(
+	{"cart", "all-products", "shop-by-category", "product_search", "order", "wishlist", "customer_reviews"}
+)
+STORE_GENERATOR_DOCTYPES = ("Website Item", "Item Group")
 
 
 def normalize_host(host):
@@ -91,6 +116,27 @@ def is_web_form_route(route):
 	)
 
 
+def is_store_generator_route(route):
+	"""A published Website Item or Item Group page (the webshop's product and category pages)."""
+	return any(
+		frappe.db.table_exists(doctype) and frappe.db.exists(doctype, {"route": route, "published": 1})
+		for doctype in STORE_GENERATOR_DOCTYPES
+	)
+
+
+def is_shared_route(site, path):
+	"""Whether ``path`` (not one of ``site``'s own pages) may be served on ``site``'s hosts."""
+	if path in TECHNICAL_ROUTES:
+		return True
+	if not site.webshop_store:
+		return False
+	return (
+		path in STORE_ACCOUNT_ROUTES
+		or path.split("/", 1)[0] in STORE_PAGE_SEGMENTS
+		or is_store_generator_route(path)
+	)
+
+
 def site_endpoint(site, path, prefixes):
 	"""The route ``path`` maps to on ``site``'s hosts (None = pass through unchanged)."""
 	if not path:
@@ -98,7 +144,11 @@ def site_endpoint(site, path, prefixes):
 	if path.split("/", 1)[0] in prefixes:
 		raise frappe.PageDoesNotExistError
 	candidate = f"{site.route_prefix}/{path}"
-	return candidate if page_exists(candidate) else None
+	if page_exists(candidate):
+		return candidate
+	if is_shared_route(site, path):
+		return None
+	raise frappe.PageDoesNotExistError
 
 
 def resolve_path(path):

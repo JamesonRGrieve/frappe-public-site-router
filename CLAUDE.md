@@ -18,9 +18,15 @@ On a host that belongs to an enabled Public Site:
 - `/<path>` → `<prefix>/<path>` when a published Web Page / Web Form / Builder Page has that route
 - `/<any site prefix>/...` (its own or another's) → `PageDoesNotExistError` (one URL per page; no
   cross-site access)
-- anything else (assets, API, login, webshop cart/product routes, global pages) passes through.
+- technical pages (`404`, `error`, `message`, `robots.txt`, `website_script.js`) pass through on
+  every site host; account/portal routes (`login`, `me`, `orders`, …), webshop pages (`cart`,
+  `all-products`, …) and published Website Item / Item Group pages pass through only on a site
+  with a `webshop_store`
+- anything else (ERPNext's generic about/contact pages, desk, the global sitemap, other global
+  pages) → `PageDoesNotExistError`, so a site shows only what it published.
 
-Hosts with no Public Site (e.g. the ERP's own host) are not rewritten.
+Static files and the API are not website routes and are never affected. Hosts with no Public Site
+(e.g. the ERP's own host) are not rewritten.
 
 `resolve_path` then hands the (possibly rewritten) path to the rest of the resolver chain: every
 other app's `website_path_resolver` (Builder's resolves Builder Pages incl. dynamic routes), else

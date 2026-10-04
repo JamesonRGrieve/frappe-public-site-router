@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Host isolation against a real test site: host → site, path → site page, other sites'
-prefixes as 404s, pass-through for shared routes, and (with the frappe-webshop fork
+prefixes as 404s, only technical routes (plus store routes on store sites) passed through
+and everything else a 404, and (with the frappe-webshop fork
 installed) per-store listing, search, product pages and cart quotations through the
 webshop_store_resolver hook."""
 
@@ -97,9 +98,10 @@ class TestPublicSiteRouting(FrappeTestCase):
 		on_host("zephyrex.test")
 		self.assertEqual(resolve_path("infrastructure/firewalls"), "zx/infrastructure/firewalls")
 
-	def test_same_path_on_other_site_is_not_mapped(self):
+	def test_same_path_on_other_site_is_404(self):
 		on_host("3shub.test")
-		self.assertNotEqual(resolve_path("infrastructure/firewalls"), "zx/infrastructure/firewalls")
+		with self.assertRaises(frappe.PageDoesNotExistError):
+			resolve_path("infrastructure/firewalls")
 
 	def test_other_sites_prefix_is_404(self):
 		on_host("3shub.test")
@@ -112,10 +114,49 @@ class TestPublicSiteRouting(FrappeTestCase):
 		with self.assertRaises(frappe.PageDoesNotExistError):
 			resolve_path("zx/home")
 
-	def test_shared_routes_pass_through(self):
+	def test_technical_routes_pass_through(self):
 		on_host("zephyrex.test")
-		self.assertEqual(resolve_path("shared-legal"), "shared-legal")
-		self.assertEqual(resolve_path("login"), "login")
+		for route in ("404", "message", "robots.txt", "website_script.js"):
+			self.assertEqual(resolve_path(route), route)
+
+	def test_unpublished_by_site_is_404(self):
+		# global pages, ERPNext's generic about/contact, desk and the global sitemap
+		on_host("zephyrex.test")
+		for route in ("shared-legal", "about", "contact", "contact/new", "app", "sitemap.xml"):
+			with self.subTest(route=route), self.assertRaises(frappe.PageDoesNotExistError):
+				resolve_path(route)
+
+	def test_store_routes_404_without_store(self):
+		on_host("zephyrex.test")
+		for route in ("login", "me", "orders", "cart", "all-products", "product_search"):
+			with self.subTest(route=route), self.assertRaises(frappe.PageDoesNotExistError):
+				resolve_path(route)
+
+	def test_store_routes_pass_through_with_store(self):
+		frappe.db.set_value("Public Site", HUB, "webshop_store", "_Test Any Store", update_modified=False)
+		frappe.clear_document_cache("Public Site", HUB)
+		for route in (
+			"login",
+			"update-password",
+			"orders",
+			"cart",
+			"all-products",
+			"shop-by-category/x",
+			"order/SO-1",
+		):
+			# passed through unchanged: resolved exactly as on a host with no Public Site
+			on_host("erp.example.test")
+			expected = resolve_path(route)
+			on_host("3shub.test")
+			self.assertEqual(resolve_path(route), expected)
+		for route in ("about", "app", "shared-legal"):
+			with self.subTest(route=route), self.assertRaises(frappe.PageDoesNotExistError):
+				resolve_path(route)
+
+	def test_erp_host_keeps_everything(self):
+		on_host("erp.example.test")
+		for route in ("login", "app", "about", "shared-legal"):
+			self.assertEqual(resolve_path(route), route)
 
 	def test_unmapped_host_is_unchanged(self):
 		on_host("erp.example.test")
@@ -145,14 +186,17 @@ class TestPublicSiteRouting(FrappeTestCase):
 					"doc_type": "ToDo",
 					"module": "Website",
 					"published": 1,
-					"web_form_fields": [{"fieldname": "description", "fieldtype": "Text", "label": "Description"}],
+					"web_form_fields": [
+						{"fieldname": "description", "fieldtype": "Text", "label": "Description"}
+					],
 				}
 			).insert()
 		on_host("zephyrex.test")
 		self.assertEqual(resolve_path("contact"), "zx/contact")
 		self.assertEqual(resolve_path("contact/new"), "zx/contact/new")
 		on_host("3shub.test")
-		self.assertNotEqual(resolve_path("contact/new"), "zx/contact/new")
+		with self.assertRaises(frappe.PageDoesNotExistError):
+			resolve_path("contact/new")
 
 	def test_redirect_to_own_prefix_is_cleaned(self):
 		on_host("www.zephyrex.test")

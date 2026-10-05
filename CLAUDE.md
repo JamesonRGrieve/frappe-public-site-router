@@ -25,7 +25,9 @@ On a host that belongs to an enabled Public Site:
 - anything else (ERPNext's generic about/contact pages, desk, the global sitemap, other global
   pages) → `PageDoesNotExistError`, so a site shows only what it published.
 
-Static files and the API are not website routes and are never affected. Hosts with no Public Site
+Hosts of a **disabled** Public Site serve nothing (every website route → `PageDoesNotExistError`), so
+a domain can be live in DNS before its site launches without exposing the ERP's own website. Static
+files and the API are not website routes and are never affected. Hosts with no Public Site at all
 (e.g. the ERP's own host) are not rewritten.
 
 `resolve_path` then hands the (possibly rewritten) path to the rest of the resolver chain: every

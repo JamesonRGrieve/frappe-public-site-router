@@ -168,6 +168,16 @@ class TestPublicSiteRouting(FrappeTestCase):
 		on_host("3shub.test")
 		self.assertIsNone(get_request_site())
 
+	def test_disabled_site_hosts_serve_nothing(self):
+		frappe.db.set_value("Public Site", HUB, "enabled", 0)
+		clear_site_map()
+		on_host("3shub.test")
+		for route in ("", "login", "about", "3sh/home", "404"):
+			with self.subTest(route=route), self.assertRaises(frappe.PageDoesNotExistError):
+				resolve_path(route)
+		on_host("erp.example.test")  # hosts of no site at all are still untouched
+		self.assertEqual(resolve_path("login"), "login")
+
 	def test_duplicate_domain_rejected(self):
 		with self.assertRaises(frappe.ValidationError):
 			make_site("_Test Clash Site", "clash", ["3shub.test"])

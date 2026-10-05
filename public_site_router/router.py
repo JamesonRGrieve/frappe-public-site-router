@@ -15,8 +15,9 @@ Each ``Public Site`` owns a set of host names and a route prefix. On one of its 
 * anything else (ERPNext's generic about/contact pages, desk, the global sitemap, other
   pages) is a 404, so a site shows nothing it did not publish.
 
-Static files and the API are not website routes and are never affected. Hosts that belong to
-no Public Site (e.g. the ERP's own host) are not rewritten.
+Hosts of a disabled Public Site serve nothing (every website route is a 404). Static files and
+the API are not website routes and are never affected. Hosts that belong to no Public Site
+(e.g. the ERP's own host) are not rewritten.
 
 Rendered pages are cached by endpoint, and endpoints are host-specific here, so one
 site's cached HTML is never served on another site's host."""
@@ -57,26 +58,30 @@ def normalize_host(host):
 
 
 def get_site_map():
-	"""{"hosts": {host: site}, "prefixes": {prefix: site}} for every enabled Public Site."""
+	"""{"hosts": {host: site}, "prefixes": {prefix: site}} for every enabled Public Site, plus
+	"closed_hosts": {host: site} for disabled ones (a site not yet launched, or taken down)."""
 
 	def build():
 		# Installed but not yet migrated (hooks live, tables absent): route nothing rather
 		# than fail every web request. Not cached, so the map appears once migrate runs.
 		if not frappe.db.table_exists("Public Site"):
 			return None
-		enabled = frappe.get_all("Public Site", filters={"enabled": 1}, fields=["name", "route_prefix"])
-		names = {s.name for s in enabled}
+		sites = frappe.get_all("Public Site", fields=["name", "route_prefix", "enabled"])
+		enabled = {s.name for s in sites if s.enabled}
 		domains = frappe.get_all(
-			"Public Site Domain",
-			filters={"parenttype": "Public Site", "parent": ["in", list(names) or [""]]},
-			fields=["parent", "domain"],
+			"Public Site Domain", filters={"parenttype": "Public Site"}, fields=["parent", "domain"]
 		)
 		return {
-			"hosts": {normalize_host(d.domain): d.parent for d in domains},
-			"prefixes": {s.route_prefix: s.name for s in enabled},
+			"hosts": {normalize_host(d.domain): d.parent for d in domains if d.parent in enabled},
+			"closed_hosts": {normalize_host(d.domain): d.parent for d in domains if d.parent not in enabled},
+			"prefixes": {s.route_prefix: s.name for s in sites if s.enabled},
 		}
 
-	return frappe.cache.get_value(SITE_MAP_CACHE_KEY, build) or {"hosts": {}, "prefixes": {}}
+	return frappe.cache.get_value(SITE_MAP_CACHE_KEY, build) or {
+		"hosts": {},
+		"closed_hosts": {},
+		"prefixes": {},
+	}
 
 
 def clear_site_map():
@@ -152,10 +157,13 @@ def site_endpoint(site, path, prefixes):
 
 
 def resolve_path(path):
-	"""website_path_resolver hook."""
+	"""website_path_resolver hook. A disabled site's hosts serve nothing (404), so a domain can go
+	live in DNS before its site launches without exposing the ERP's own website on it."""
 	site = get_request_site()
 	if site:
 		path = site_endpoint(site, path, get_site_map()["prefixes"]) or path
+	elif get_request_host() in get_site_map().get("closed_hosts", {}):
+		raise frappe.PageDoesNotExistError
 	return resolve_with_other_resolvers(path)
 
 

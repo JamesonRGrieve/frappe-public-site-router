@@ -31,6 +31,11 @@ class PublicSite(Document):
 		clear_site_map()
 		clear_website_cache()
 
+	def after_rename(self, old_name, new_name, merge=False):
+		# The site map and rendered pages (og:site_name) name the site; Frappe updates links to it.
+		clear_site_map()
+		clear_website_cache()
+
 	def validate_route_prefix(self):
 		self.route_prefix = (self.route_prefix or "").strip("/").lower()
 		if not PREFIX_PATTERN.match(self.route_prefix):

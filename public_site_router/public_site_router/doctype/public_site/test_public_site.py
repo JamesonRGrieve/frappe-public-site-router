@@ -678,3 +678,12 @@ class TestPublicSiteAnalytics(FrappeTestCase):
 
 	def test_web_page_view_has_the_public_site_field(self):
 		self.assertTrue(frappe.get_meta("Web Page View").has_field("public_site"))
+
+	def test_renaming_a_site_carries_its_views_and_hosts(self):
+		view = frappe.get_doc({"doctype": "Web Page View", "path": "/", "public_site": ZX}).insert()
+		on_host("zephyrex.test")
+		self.assertEqual(get_request_site().name, ZX)
+		renamed = frappe.rename_doc("Public Site", ZX, f"{ZX} Renamed")
+		self.assertEqual(frappe.db.get_value("Public Site", renamed, "site_name"), renamed)
+		self.assertEqual(frappe.db.get_value("Web Page View", view.name, "public_site"), renamed)
+		self.assertEqual(get_request_site().name, renamed)

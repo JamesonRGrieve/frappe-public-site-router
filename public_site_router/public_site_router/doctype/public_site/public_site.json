@@ -1,5 +1,6 @@
 {
  "actions": [],
+ "allow_rename": 1,
  "autoname": "field:site_name",
  "creation": "2026-10-03 12:00:00.000000",
  "description": "One business's public website on this Frappe site. Requests on its domains see only its pages: / is its home page, /<path> is the page routed <route prefix>/<path>, and every other site's prefix is a 404. Shared routes (assets, API, login, webshop cart) pass through.",
@@ -128,7 +129,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-09 15:00:00.000000",
+ "modified": "2026-10-09 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "Public Site Router",
  "name": "Public Site",

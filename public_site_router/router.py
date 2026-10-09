@@ -119,7 +119,7 @@ def page_site(context):
 def get_request_store():
 	"""webshop_store_resolver hook (frappe-webshop fork): this request's Webshop Store."""
 	site = get_request_site()
-	return site.webshop_store if site and site.webshop_store else None
+	return (site.get("webshop_store") or None) if site else None
 
 
 def page_exists(route):
@@ -147,19 +147,19 @@ def is_store_generator_route(route):
 
 def is_site_blog_post(site, route):
 	"""A published Blog Post (blog app) in ``site``'s Blog Category, routed ``route``."""
+	category = site.get("blog_category")
 	return bool(
-		site.blog_category
+		category
 		and frappe.db.table_exists("Blog Post")
-		and frappe.db.exists(
-			"Blog Post", {"route": route, "published": 1, "blog_category": site.blog_category}
-		)
+		and frappe.db.exists("Blog Post", {"route": route, "published": 1, "blog_category": category})
 	)
 
 
 def site_home(site):
 	"""The route ``/`` maps to: a blog site's category listing, else its home page."""
-	if site.blog_category:
-		return frappe.db.get_value("Blog Category", site.blog_category, "route")
+	category = site.get("blog_category")
+	if category:
+		return frappe.db.get_value("Blog Category", category, "route")
 	return f"{site.route_prefix}/{site.home_route}"
 
 
@@ -167,7 +167,7 @@ def is_shared_route(site, path):
 	"""Whether ``path`` (not one of ``site``'s own pages) may be served on ``site``'s hosts."""
 	if path in TECHNICAL_ROUTES:
 		return True
-	if not site.webshop_store:
+	if not site.get("webshop_store"):
 		return False
 	return (
 		path in STORE_ACCOUNT_ROUTES

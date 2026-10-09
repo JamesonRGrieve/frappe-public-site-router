@@ -167,6 +167,17 @@ class TestPublicSiteRouting(FrappeTestCase):
 			with self.subTest(route=route), self.assertRaises(frappe.PageDoesNotExistError):
 				resolve_path(route)
 
+	def test_site_without_later_columns_still_routes(self):
+		# Between a router upgrade swapping in new code and its migrate adding new Public Site columns,
+		# a loaded site has only the original fields. Routing must treat the absent ones as unset.
+		from public_site_router.router import is_shared_route, is_site_blog_post, site_home
+
+		pre_migrate = frappe._dict(name=ZX, route_prefix="zx", home_route="home")
+		self.assertEqual(site_home(pre_migrate), "zx/home")
+		self.assertFalse(is_site_blog_post(pre_migrate, "anything"))
+		self.assertFalse(is_shared_route(pre_migrate, "cart"))
+		self.assertTrue(is_shared_route(pre_migrate, "404"))
+
 	def test_erp_host_keeps_everything(self):
 		on_host("erp.example.test")
 		for route in ("login", "app", "about", "shared-legal"):

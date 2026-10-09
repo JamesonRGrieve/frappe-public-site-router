@@ -62,20 +62,25 @@ def robots_txt():
 
 
 def update_website_context(context):
-	"""update_website_context hook: canonical link and Open Graph URL tags for a site's pages."""
+	"""update_website_context hook: canonical link, Open Graph URL tags and the site's favicon on its pages."""
 	page = page_site(context)
 	if not page:
 		return
 	site, endpoint = page
 	host = canonical_host(site)
+	erp_hosts = {normalize_host(get_url())}
 	url = seo.page_url(host, seo.clean_path(endpoint, site.route_prefix, site_home(site)))
-	context.head_html = (context.get("head_html") or "") + seo.canonical_link(url)
+	head = seo.canonical_link(url)
+	if site.get("favicon"):
+		# base.html renders `favicon` as the tab icon; the same image is the home-screen icon.
+		context.favicon = seo.site_asset_url(site.favicon, erp_hosts, host)
+		head += seo.touch_icon_link(context.favicon)
+	context.head_html = (context.get("head_html") or "") + head
 	tags = context.get("metatags")
 	if tags is None:
 		return
 	tags["og:url"] = url
 	tags["og:site_name"] = site.site_name
-	erp_hosts = {normalize_host(get_url())}
 	for key in IMAGE_TAGS:
 		if tags.get(key):
 			tags[key] = seo.rehost(tags[key], erp_hosts, host)

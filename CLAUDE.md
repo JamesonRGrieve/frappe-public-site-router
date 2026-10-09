@@ -57,6 +57,8 @@ The host → site map is cached (`public_site_router_site_map`) and cleared on P
 - `update_website_context` hook: appends `<link rel="canonical">` to `head_html`, sets `og:url` and
   `og:site_name`, and moves absolute image URLs Frappe built on the ERP's own host (`get_url()`) onto
   the canonical host. Nothing on technical pages, 404s or hosts outside a Public Site.
+- `favicon` (Public Site, square PNG): the same hook sets `context.favicon` (base.html's tab icon) and adds
+  an `apple-touch-icon` link, both on the canonical host. Empty keeps the Website Settings favicon.
 - Both `www/public_site_*` pages are `no_cache` (one endpoint serves every site) and 404 off a site host.
 - Per-page titles, descriptions, `meta_image` (Open Graph card) and JSON-LD belong to the page content
   (Web Page fields and its HTML), not this app.

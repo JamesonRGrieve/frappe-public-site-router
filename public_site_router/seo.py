@@ -118,3 +118,15 @@ def rehost(url: str, from_hosts: set[str], host: str) -> str:
 	if parts.netloc and parts.netloc.lower() in from_hosts:
 		return urlunsplit(parts._replace(scheme=SCHEME, netloc=host))
 	return url
+
+
+def site_asset_url(url: str, from_hosts: set[str], host: str) -> str:
+	"""A file URL as the site's canonical host serves it: a site-relative path (``/files/x.png``) gains
+	the host, an ERP-host URL moves onto it, and any other absolute URL is kept."""
+	if url.startswith("/") and not url.startswith("//"):
+		return f"{SCHEME}://{host}{url}"
+	return rehost(url, from_hosts, host)
+
+
+def touch_icon_link(url: str) -> str:
+	return f'<link rel="apple-touch-icon" href="{escape(url, quote=True)}">'

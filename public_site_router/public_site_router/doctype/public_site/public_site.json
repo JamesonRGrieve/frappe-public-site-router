@@ -17,6 +17,8 @@
   "blog_category",
   "domains_section",
   "domains",
+  "branding_section",
+  "favicon",
   "analytics_section",
   "view_tracking",
   "ga4_measurement_id",
@@ -94,6 +96,17 @@
    "reqd": 1
   },
   {
+   "fieldname": "branding_section",
+   "fieldtype": "Section Break",
+   "label": "Branding"
+  },
+  {
+   "description": "Square PNG (at least 180×180) shown in browser tabs and as the home-screen icon on this site's pages. Empty: the Website Settings favicon.",
+   "fieldname": "favicon",
+   "fieldtype": "Attach Image",
+   "label": "Favicon"
+  },
+  {
    "fieldname": "analytics_section",
    "fieldtype": "Section Break",
    "label": "Analytics"
@@ -129,7 +142,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-09 16:00:00.000000",
+ "modified": "2026-10-09 17:00:00.000000",
  "modified_by": "Administrator",
  "module": "Public Site Router",
  "name": "Public Site",

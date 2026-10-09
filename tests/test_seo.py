@@ -163,3 +163,34 @@ class TestRehost:
 
 	def test_host_match_ignores_case(self):
 		assert seo.rehost("https://ERP.zephyrex.ca/x", self.ERP, "zephyrex.ca") == "https://zephyrex.ca/x"
+
+
+class TestSiteAssetUrl:
+	ERP = {"erp.zephyrex.ca"}
+
+	def test_site_relative_file_gains_the_canonical_host(self):
+		assert (
+			seo.site_asset_url("/files/zephyrex.png", self.ERP, "zephyrex.ca")
+			== "https://zephyrex.ca/files/zephyrex.png"
+		)
+
+	def test_erp_host_file_moves_onto_the_site(self):
+		url = "https://erp.zephyrex.ca/files/3shub.png"
+		assert seo.site_asset_url(url, self.ERP, "3shub.com") == "https://3shub.com/files/3shub.png"
+
+	def test_other_absolute_and_protocol_relative_urls_are_kept(self):
+		assert (
+			seo.site_asset_url("https://cdn.example.com/i.png", self.ERP, "3shub.com")
+			== "https://cdn.example.com/i.png"
+		)
+		assert (
+			seo.site_asset_url("//cdn.example.com/i.png", self.ERP, "3shub.com") == "//cdn.example.com/i.png"
+		)
+
+
+class TestTouchIcon:
+	def test_link_is_escaped(self):
+		assert (
+			seo.touch_icon_link('https://a.ca/f "x".png')
+			== '<link rel="apple-touch-icon" href="https://a.ca/f &quot;x&quot;.png">'
+		)

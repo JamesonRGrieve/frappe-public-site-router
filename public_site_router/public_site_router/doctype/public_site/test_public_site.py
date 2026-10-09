@@ -545,6 +545,24 @@ class TestPublicSiteSeo(FrappeTestCase):
 		self.assertEqual(context.metatags["og:image"], "https://zephyrex.test/files/card.png")
 		self.assertEqual(context.metatags["image"], "https://zephyrex.test/files/card.png")
 
+	def test_site_favicon_is_the_tab_and_home_screen_icon_on_its_host(self):
+		frappe.db.set_value("Public Site", ZX, "favicon", "/files/zephyrex.png")
+		clear_site_map()
+		on_host("www.zephyrex.test")
+		context = self.context("zx/about")
+		site_seo.update_website_context(context)
+		self.assertEqual(context.favicon, "https://zephyrex.test/files/zephyrex.png")
+		self.assertIn(
+			'<link rel="apple-touch-icon" href="https://zephyrex.test/files/zephyrex.png">', context.head_html
+		)
+
+	def test_no_favicon_keeps_the_website_settings_one(self):
+		on_host("zephyrex.test")
+		context = self.context("zx/about", favicon="/assets/erpnext/images/erpnext-favicon.svg")
+		site_seo.update_website_context(context)
+		self.assertEqual(context.favicon, "/assets/erpnext/images/erpnext-favicon.svg")
+		self.assertNotIn("apple-touch-icon", context.head_html)
+
 	def test_nothing_added_off_site_or_on_technical_pages(self):
 		on_host("erp.example.test")
 		context = self.context("zx/about")

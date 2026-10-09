@@ -12,6 +12,9 @@ Each ``Public Site`` owns a set of host names and a route prefix. On one of its 
 * a few technical pages (404/error/message, robots.txt, website_script.js) pass through
   everywhere; account, portal and webshop routes (login, cart, listing, product and item-group
   pages) pass through only on a site with a Webshop Store;
+* on a site with a Blog Category, ``/`` serves that category's post listing and ``/<path>``
+  serves a published Blog Post (blog app) of that category routed ``<path>``. Posts keep root
+  routes, so the blog app's own links to them are already the clean URLs;
 * anything else (ERPNext's generic about/contact pages, desk, the global sitemap, other
   pages) is a 404, so a site shows nothing it did not publish.
 
@@ -129,6 +132,24 @@ def is_store_generator_route(route):
 	)
 
 
+def is_site_blog_post(site, route):
+	"""A published Blog Post (blog app) in ``site``'s Blog Category, routed ``route``."""
+	return bool(
+		site.blog_category
+		and frappe.db.table_exists("Blog Post")
+		and frappe.db.exists(
+			"Blog Post", {"route": route, "published": 1, "blog_category": site.blog_category}
+		)
+	)
+
+
+def site_home(site):
+	"""The route ``/`` maps to: a blog site's category listing, else its home page."""
+	if site.blog_category:
+		return frappe.db.get_value("Blog Category", site.blog_category, "route")
+	return f"{site.route_prefix}/{site.home_route}"
+
+
 def is_shared_route(site, path):
 	"""Whether ``path`` (not one of ``site``'s own pages) may be served on ``site``'s hosts."""
 	if path in TECHNICAL_ROUTES:
@@ -145,13 +166,13 @@ def is_shared_route(site, path):
 def site_endpoint(site, path, prefixes):
 	"""The route ``path`` maps to on ``site``'s hosts (None = pass through unchanged)."""
 	if not path:
-		return f"{site.route_prefix}/{site.home_route}"
+		return site_home(site)
 	if path.split("/", 1)[0] in prefixes:
 		raise frappe.PageDoesNotExistError
 	candidate = f"{site.route_prefix}/{path}"
 	if page_exists(candidate):
 		return candidate
-	if is_shared_route(site, path):
+	if is_site_blog_post(site, path) or is_shared_route(site, path):
 		return None
 	raise frappe.PageDoesNotExistError
 

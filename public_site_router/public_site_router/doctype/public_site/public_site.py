@@ -16,6 +16,7 @@ class PublicSite(Document):
 		self.normalize_domains()
 		self.validate_unique_domains()
 		self.validate_webshop_store()
+		self.validate_blog_category()
 		self.home_route = self.home_route.strip("/")
 
 	def on_update(self):
@@ -54,3 +55,18 @@ class PublicSite(Document):
 			frappe.throw(_("Webshop Store needs the frappe-webshop fork installed."))
 		if not frappe.db.exists("Webshop Store", self.webshop_store):
 			frappe.throw(_("Webshop Store {0} does not exist.").format(self.webshop_store))
+
+	def validate_blog_category(self):
+		if not self.blog_category:
+			return
+		if not frappe.db.table_exists("Blog Category"):
+			frappe.throw(_("Blog Category needs the blog app installed."))
+		if not frappe.db.exists("Blog Category", self.blog_category):
+			frappe.throw(_("Blog Category {0} does not exist.").format(self.blog_category))
+		taken = frappe.db.get_value(
+			"Public Site", {"blog_category": self.blog_category, "name": ["!=", self.name]}, "name"
+		)
+		if taken:
+			frappe.throw(
+				_("Blog Category {0} already belongs to site {1}.").format(self.blog_category, taken)
+			)

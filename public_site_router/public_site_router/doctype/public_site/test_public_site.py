@@ -15,6 +15,7 @@ from werkzeug.wrappers import Request, Response
 from public_site_router.router import (
 	clean_redirect,
 	clear_site_map,
+	get_request_host,
 	get_request_site,
 	get_request_store,
 	normalize_host,
@@ -32,7 +33,7 @@ def on_host(host):
 	frappe.local.request = Request(EnvironBuilder(base_url=f"http://{host}/").get_environ()) if host else None
 
 
-def make_site(name, prefix, domains, company=None, webshop_store=None):
+def make_site(name, prefix, domains, company=None, webshop_store=None, blog_category=None):
 	if frappe.db.exists("Public Site", name):
 		frappe.delete_doc("Public Site", name, force=True)
 	return frappe.get_doc(
@@ -44,6 +45,7 @@ def make_site(name, prefix, domains, company=None, webshop_store=None):
 			"route_prefix": prefix,
 			"home_route": "home",
 			"webshop_store": webshop_store,
+			"blog_category": blog_category,
 			"domains": [{"domain": d} for d in domains],
 		}
 	).insert()
@@ -237,6 +239,109 @@ class TestPublicSiteRouting(FrappeTestCase):
 	def test_no_store_without_webshop_store(self):
 		on_host("zephyrex.test")
 		self.assertIsNone(get_request_store())
+
+
+@unittest.skipUnless("blog" in frappe.get_installed_apps(), "blog app not installed")
+class TestPublicSiteBlog(FrappeTestCase):
+	"""Root-routed Blog Posts served only on the site whose Blog Category they belong to."""
+
+	def setUp(self):
+		frappe.set_user("Administrator")
+		if not frappe.db.exists("Blogger", "_test-blogger"):
+			frappe.get_doc(
+				{"doctype": "Blogger", "short_name": "_test-blogger", "full_name": "Test Blogger"}
+			).insert()
+		self.hub_category = self.category("_Test Hub Blog")
+		self.zx_category = self.category("_Test ZX Blog")
+		make_site(ZX, "zx", ["zephyrex.test"], blog_category=self.zx_category)
+		make_site(HUB, "3sh", ["3shub.test"], blog_category=self.hub_category)
+		make_web_page("3sh/clash", "Hub Clash Page")
+		self.post("hub-guide", self.hub_category)
+		self.post("zx-notes", self.zx_category)
+		self.post("hub-draft", self.hub_category, published=0)
+		self.post("clash", self.hub_category)
+		clear_site_map()
+
+	def tearDown(self):
+		on_host(None)
+		frappe.db.rollback()
+		clear_site_map()
+
+	@staticmethod
+	def category(title):
+		name = frappe.db.get_value("Blog Category", {"title": title})
+		return (
+			name or frappe.get_doc({"doctype": "Blog Category", "title": title, "published": 1}).insert().name
+		)
+
+	@staticmethod
+	def post(route, category, published=1):
+		if not frappe.db.exists("Blog Post", {"route": route}):
+			frappe.get_doc(
+				{
+					"doctype": "Blog Post",
+					"title": f"_Test {route}",
+					"route": route,
+					"blog_category": category,
+					"blogger": "_test-blogger",
+					"content_type": "HTML",
+					"content_html": f"<p>{route}</p>",
+					"published": published,
+				}
+			).insert()
+
+	def test_post_route_kept_at_root(self):
+		self.assertEqual(frappe.db.get_value("Blog Post", {"title": "_Test hub-guide"}, "route"), "hub-guide")
+
+	def test_own_post_passes_through(self):
+		on_host("erp.example.test")
+		expected = resolve_path("hub-guide")
+		on_host("3shub.test")
+		self.assertEqual(resolve_path("hub-guide"), expected)
+
+	def test_other_sites_post_is_404(self):
+		on_host("3shub.test")
+		with self.assertRaises(frappe.PageDoesNotExistError):
+			resolve_path("zx-notes")
+		on_host("zephyrex.test")
+		with self.assertRaises(frappe.PageDoesNotExistError):
+			resolve_path("hub-guide")
+
+	def test_unpublished_post_is_404(self):
+		on_host("3shub.test")
+		with self.assertRaises(frappe.PageDoesNotExistError):
+			resolve_path("hub-draft")
+
+	def test_root_is_category_listing(self):
+		on_host("3shub.test")
+		self.assertEqual(
+			resolve_path(""),
+			resolve_path_off_site(frappe.db.get_value("Blog Category", self.hub_category, "route")),
+		)
+
+	def test_site_page_wins_over_post(self):
+		on_host("3shub.test")
+		self.assertEqual(resolve_path("clash"), "3sh/clash")
+
+	def test_blog_category_unique_per_site(self):
+		with self.assertRaises(frappe.ValidationError):
+			make_site("_Test Clash Site", "clash", ["clash.test"], blog_category=self.hub_category)
+
+	def test_unknown_blog_category_rejected(self):
+		with self.assertRaises(frappe.ValidationError):
+			make_site(
+				"_Test Bad Blog Site", "badblog", ["badblog.test"], blog_category="_Test No Such Category"
+			)
+
+
+def resolve_path_off_site(route):
+	"""``route`` as a host with no Public Site resolves it (the router passes it on unchanged)."""
+	host = get_request_host()
+	on_host("erp.example.test")
+	try:
+		return resolve_path(route)
+	finally:
+		on_host(host)
 
 
 @unittest.skipUnless("webshop" in frappe.get_installed_apps(), "frappe-webshop fork not installed")

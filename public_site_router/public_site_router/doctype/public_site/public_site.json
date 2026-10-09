@@ -13,6 +13,7 @@
   "route_prefix",
   "home_route",
   "webshop_store",
+  "blog_category",
   "domains_section",
   "domains"
  ],
@@ -68,6 +69,12 @@
    "label": "Webshop Store"
   },
   {
+   "description": "Name of the Blog Category (blog app) this site publishes, if any. Its posts serve at /<post route> and / serves the category's listing instead of the home route.",
+   "fieldname": "blog_category",
+   "fieldtype": "Data",
+   "label": "Blog Category"
+  },
+  {
    "fieldname": "domains_section",
    "fieldtype": "Section Break",
    "label": "Domains"
@@ -81,7 +88,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-03 12:00:00.000000",
+ "modified": "2026-10-09 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Public Site Router",
  "name": "Public Site",

@@ -8,7 +8,8 @@ public websites, each isolated to its own host names. No Frappe fork: it uses Fr
 
 - **Public Site**: `site_name`, `enabled`, `company`, `route_prefix` (one lowercase URL segment,
   unique), `home_route` (under the prefix, default `home`), `webshop_store` (name of a
-  frappe-webshop fork `Webshop Store`, optional), `domains` (child **Public Site Domain**, host
+  frappe-webshop fork `Webshop Store`, optional), `blog_category` (name of a blog-app `Blog Category`,
+  optional, one site per category), `domains` (child **Public Site Domain**, host
   names normalised to lowercase, no port; unique across sites).
 
 ## Routing (`router.py`)
@@ -22,6 +23,10 @@ On a host that belongs to an enabled Public Site:
   every site host; account/portal routes (`login`, `me`, `orders`, …), webshop pages (`cart`,
   `all-products`, …) and published Website Item / Item Group pages pass through only on a site
   with a `webshop_store`
+- on a site with a `blog_category`: `/` → that category's listing (`blog/<category>`, instead of the
+  home route), and `/<path>` → a published Blog Post of that category routed `<path>`. Posts keep
+  **root** routes (not prefixed) because the blog app links posts as `/<route>` in its listing,
+  RSS and sitemap; the category is what isolates them. A site page with the same path wins.
 - anything else (ERPNext's generic about/contact pages, desk, the global sitemap, other global
   pages) → `PageDoesNotExistError`, so a site shows only what it published.
 

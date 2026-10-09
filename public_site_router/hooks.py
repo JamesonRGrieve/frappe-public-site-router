@@ -20,5 +20,8 @@ website_path_resolver = "public_site_router.router.resolve_path"
 # Rewrites a redirect to a site's prefixed route into its clean URL on that site's hosts.
 after_request = ["public_site_router.router.clean_redirect"]
 
+# Canonical link, og:url and og:site_name naming the request's site's canonical host.
+update_website_context = ["public_site_router.site_seo.update_website_context"]
+
 # Answers the frappe-webshop fork's multi-store hook: which Webshop Store serves this request.
 webshop_store_resolver = "public_site_router.router.get_request_store"

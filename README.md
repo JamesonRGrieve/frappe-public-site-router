@@ -13,6 +13,10 @@ store each request belongs to, so each business can have its own shop.
 
 Built on Frappe v16's `website_path_resolver` hook; Frappe itself is not modified.
 
+Each site also gets its own SEO surface on its hosts: a `/sitemap.xml` of only its published pages,
+posts and store items, a `/robots.txt` that names it, and a canonical link and `og:url` on every page,
+all on the site's canonical host (its first non-`www` domain).
+
 ## Install
 
 ```sh

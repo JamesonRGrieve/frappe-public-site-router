@@ -19,7 +19,9 @@ On a host that belongs to an enabled Public Site:
 - `/<path>` → `<prefix>/<path>` when a published Web Page / Web Form / Builder Page has that route
 - `/<any site prefix>/...` (its own or another's) → `PageDoesNotExistError` (one URL per page; no
   cross-site access)
-- technical pages (`404`, `error`, `message`, `robots.txt`, `website_script.js`) pass through on
+- `/sitemap.xml` and `/robots.txt` → the site's own (`public_site_sitemap.xml` /
+  `public_site_robots.txt` in `www/`, built by `site_seo`); see **SEO** below
+- technical pages (`404`, `error`, `message`, `website_script.js`) pass through on
   every site host; account/portal routes (`login`, `me`, `orders`, …), webshop pages (`cart`,
   `all-products`, …) and published Website Item / Item Group pages pass through only on a site
   with a `webshop_store`
@@ -42,6 +44,22 @@ installed after any other app that registers `website_path_resolver`.
 
 The host → site map is cached (`public_site_router_site_map`) and cleared on Public Site save/delete.
 
+## SEO (`seo.py` pure, `site_seo.py` Frappe)
+
+- A site's **canonical host** is its first domain that is not a `www.` alias. Every URL the site
+  publishes names it, so apex and `www` render identical HTML (Frappe caches pages per endpoint).
+- `/sitemap.xml`: the site's published Web Pages, Builder Pages and Web Forms under its prefix (as
+  clean URLs; the home page is `/`), its blog category's published posts (and the listing at `/`), and
+  its store's published Website Items. Dynamic routes are left out. `lastmod` is the document's
+  `modified` day.
+- `/robots.txt`: disallows the desk, API and account pages and names the site's sitemap.
+- `update_website_context` hook: appends `<link rel="canonical">` to `head_html`, sets `og:url` and
+  `og:site_name`, and moves absolute image URLs Frappe built on the ERP's own host (`get_url()`) onto
+  the canonical host. Nothing on technical pages, 404s or hosts outside a Public Site.
+- Both `www/public_site_*` pages are `no_cache` (one endpoint serves every site) and 404 off a site host.
+- Per-page titles, descriptions, `meta_image` (Open Graph card) and JSON-LD belong to the page content
+  (Web Page fields and its HTML), not this app.
+
 ## Webshop stores
 
 Implements the frappe-webshop fork's `webshop_store_resolver` hook: the request's site's
@@ -57,3 +75,6 @@ site's cached HTML is never served on another host. Shared routes whose content 
 
 `bench --site <site> run-tests --app public_site_router` (real DB). The webshop test class runs
 end-to-end through the fork when `webshop` is installed, and is skipped otherwise.
+
+The pure SEO logic is unit-tested without a bench: `uv run --no-project --with pytest python -I -m pytest`
+(`tests/`). Lint: `uvx ruff format --check . && uvx ruff check .`

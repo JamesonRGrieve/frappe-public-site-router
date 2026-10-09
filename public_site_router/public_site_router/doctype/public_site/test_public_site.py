@@ -12,6 +12,7 @@ from frappe.tests.utils import FrappeTestCase
 from werkzeug.test import EnvironBuilder
 from werkzeug.wrappers import Request, Response
 
+from public_site_router import site_seo
 from public_site_router.router import (
 	clean_redirect,
 	clear_site_map,
@@ -118,8 +119,19 @@ class TestPublicSiteRouting(FrappeTestCase):
 
 	def test_technical_routes_pass_through(self):
 		on_host("zephyrex.test")
-		for route in ("404", "message", "robots.txt", "website_script.js"):
+		for route in ("404", "message", "website_script.js"):
 			self.assertEqual(resolve_path(route), route)
+
+	def test_sitemap_and_robots_are_the_sites_own(self):
+		on_host("zephyrex.test")
+		self.assertEqual(resolve_path("sitemap.xml"), "public_site_sitemap.xml")
+		self.assertEqual(resolve_path("robots.txt"), "public_site_robots.txt")
+
+	def test_seo_pages_are_404_by_their_own_name_on_a_site_host(self):
+		on_host("zephyrex.test")
+		for route in ("public_site_sitemap.xml", "public_site_robots.txt"):
+			with self.assertRaises(frappe.PageDoesNotExistError):
+				resolve_path(route)
 
 	def test_unpublished_by_site_is_404(self):
 		# global pages, ERPNext's generic about/contact, desk and the global sitemap
@@ -290,6 +302,15 @@ class TestPublicSiteBlog(FrappeTestCase):
 				}
 			).insert()
 
+	def test_sitemap_lists_the_listing_and_own_published_posts(self):
+		on_host("3shub.test")
+		xml = site_seo.sitemap_xml()
+		self.assertIn("<loc>https://3shub.test/</loc>", xml)
+		self.assertIn("<loc>https://3shub.test/hub-guide</loc>", xml)
+		self.assertIn("<loc>https://3shub.test/clash</loc>", xml)
+		self.assertNotIn("hub-draft", xml)
+		self.assertNotIn("zx-notes", xml)
+
 	def test_post_route_kept_at_root(self):
 		self.assertEqual(frappe.db.get_value("Blog Post", {"title": "_Test hub-guide"}, "route"), "hub-guide")
 
@@ -437,9 +458,120 @@ class TestPublicSiteWebshop(FrappeTestCase):
 		doc.get_context(context)
 		self.assertEqual(context.no_cache, 1)
 
+	def test_sitemap_lists_only_the_sites_store_items(self):
+		zx_route = frappe.db.get_value("Website Item", self.zx_item, "route")
+		hub_route = frappe.db.get_value("Website Item", self.hub_item, "route")
+		on_host("zephyrex.test")
+		xml = site_seo.sitemap_xml()
+		self.assertIn(f"<loc>https://zephyrex.test/{zx_route}</loc>", xml)
+		self.assertNotIn(hub_route, xml)
+
 	def test_cart_quotation_uses_store_company(self):
 		from webshop.webshop.shopping_cart.cart import _get_cart_quotation
 
 		on_host("3shub.test")
 		quotation = _get_cart_quotation(frappe.get_doc("Customer", "_Test Customer"))
 		self.assertEqual(quotation.company, "_Test Company 1")
+
+
+class TestPublicSiteSeo(FrappeTestCase):
+	"""Per-host sitemap, robots.txt, canonical link and Open Graph URLs, against a real test site."""
+
+	def setUp(self):
+		frappe.set_user("Administrator")
+		make_site(ZX, "zx", ["www.zephyrex.test", "zephyrex.test"])
+		make_site(HUB, "3sh", ["3shub.test"])
+		for route, title in (
+			("zx/home", "ZX Home"),
+			("zx/about", "ZX About"),
+			("zx/infrastructure/firewalls", "ZX Firewalls"),
+			("3sh/home", "Hub Home"),
+			("shared-legal", "Shared Legal"),
+		):
+			make_web_page(route, title)
+		make_web_page("zx/draft", "ZX Draft")
+		frappe.db.set_value("Web Page", {"route": "zx/draft"}, "published", 0)
+		clear_site_map()
+
+	def tearDown(self):
+		on_host(None)
+		frappe.local.path = None
+		frappe.db.rollback()
+		clear_site_map()
+
+	def test_sitemap_lists_only_the_sites_published_pages_on_its_canonical_host(self):
+		on_host("www.zephyrex.test")
+		xml = site_seo.sitemap_xml()
+		for path in ("", "about", "infrastructure/firewalls"):
+			self.assertIn(f"<loc>https://zephyrex.test/{path}</loc>", xml)
+		for absent in ("zx/", "/home<", "draft", "shared-legal", "3sh", "www."):
+			self.assertNotIn(absent, xml)
+
+	def test_robots_names_the_sites_sitemap(self):
+		on_host("www.zephyrex.test")
+		self.assertIn("Sitemap: https://zephyrex.test/sitemap.xml", site_seo.robots_txt())
+
+	def test_seo_pages_are_404_off_a_site_host(self):
+		on_host("erp.example.test")
+		with self.assertRaises(frappe.PageDoesNotExistError):
+			site_seo.sitemap_xml()
+		with self.assertRaises(frappe.PageDoesNotExistError):
+			site_seo.robots_txt()
+
+	def context(self, endpoint, **values):
+		frappe.local.path = endpoint
+		return frappe._dict({"metatags": frappe._dict(), "head_html": "<meta name=x>"} | values)
+
+	def test_canonical_and_og_url_name_the_clean_url_on_the_canonical_host(self):
+		on_host("www.zephyrex.test")
+		context = self.context("zx/infrastructure/firewalls")
+		site_seo.update_website_context(context)
+		url = "https://zephyrex.test/infrastructure/firewalls"
+		self.assertEqual(context.head_html, f'<meta name=x><link rel="canonical" href="{url}">')
+		self.assertEqual(context.metatags["og:url"], url)
+		self.assertEqual(context.metatags["og:site_name"], ZX)
+
+	def test_home_canonical_is_the_root(self):
+		on_host("zephyrex.test")
+		context = self.context("zx/home")
+		site_seo.update_website_context(context)
+		self.assertEqual(context.metatags["og:url"], "https://zephyrex.test/")
+
+	def test_images_on_the_erp_host_move_to_the_site_host(self):
+		on_host("zephyrex.test")
+		erp_image = frappe.utils.get_url("/files/card.png")
+		context = self.context("zx/about", metatags=frappe._dict({"image": erp_image, "og:image": erp_image}))
+		site_seo.update_website_context(context)
+		self.assertEqual(context.metatags["og:image"], "https://zephyrex.test/files/card.png")
+		self.assertEqual(context.metatags["image"], "https://zephyrex.test/files/card.png")
+
+	def test_nothing_added_off_site_or_on_technical_pages(self):
+		on_host("erp.example.test")
+		context = self.context("zx/about")
+		site_seo.update_website_context(context)
+		self.assertEqual(context.head_html, "<meta name=x>")
+		on_host("zephyrex.test")
+		for endpoint in ("404", "message"):
+			context = self.context(endpoint)
+			site_seo.update_website_context(context)
+			self.assertNotIn("og:url", context.metatags)
+
+	def test_not_found_page_gets_no_canonical(self):
+		on_host("zephyrex.test")
+		context = self.context("zx/missing", http_status_code=404)
+		site_seo.update_website_context(context)
+		self.assertNotIn("canonical", context.head_html)
+
+	def test_renders_sitemap_and_robots_through_frappe(self):
+		from frappe.website.serve import get_response
+
+		on_host("zephyrex.test")
+		sitemap = get_response("sitemap.xml")
+		self.assertEqual(sitemap.status_code, 200)
+		# Frappe takes the type from the endpoint's extension; the system's mime.types decides which.
+		self.assertIn(sitemap.mimetype, ("application/xml", "text/xml"))
+		self.assertIn(b"<loc>https://zephyrex.test/about</loc>", sitemap.data)
+		robots = get_response("robots.txt")
+		self.assertEqual(robots.status_code, 200)
+		self.assertEqual(robots.mimetype, "text/plain")
+		self.assertIn(b"Sitemap: https://zephyrex.test/sitemap.xml", robots.data)

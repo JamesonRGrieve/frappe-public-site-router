@@ -23,6 +23,11 @@ build-backend = "flit_core.buildapi"
 [tool.bench.frappe-dependencies]
 frappe = ">=16.0.0,<17.0.0"
 
+# Pure-logic unit tests (no bench). Frappe-backed tests run with `bench run-tests --app public_site_router`.
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
 [tool.ruff]
 line-length = 110
 target-version = "py314"

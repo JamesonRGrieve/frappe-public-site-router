@@ -9,7 +9,8 @@ Each ``Public Site`` owns a set of host names and a route prefix. On one of its 
   is sent to ``/<path>`` instead;
 * any path whose first segment is a site prefix (its own or another's) is a 404, so a
   site's pages are reachable only through its own clean URLs;
-* a few technical pages (404/error/message, robots.txt, website_script.js) pass through
+* ``/sitemap.xml`` and ``/robots.txt`` are the site's own (``site_seo``), naming its canonical host;
+* a few technical pages (404/error/message, website_script.js) pass through
   everywhere; account, portal and webshop routes (login, cart, listing, product and item-group
   pages) pass through only on a site with a Webshop Store;
 * on a site with a Blog Category, ``/`` serves that category's post listing and ``/<path>``
@@ -34,7 +35,9 @@ SITE_MAP_CACHE_KEY = "public_site_router_site_map"
 OWN_RESOLVER = "public_site_router.router.resolve_path"
 ROUTED_DOCTYPES = ("Web Page", "Builder Page")
 # Website routes every Public Site host serves besides its own pages.
-TECHNICAL_ROUTES = frozenset({"404", "error", "message", "robots.txt", "website_script.js"})
+TECHNICAL_ROUTES = frozenset({"404", "error", "message", "website_script.js"})
+# A site host's sitemap and robots.txt are the site's own (www/public_site_*, built in site_seo).
+SEO_ENDPOINTS = {"sitemap.xml": "public_site_sitemap.xml", "robots.txt": "public_site_robots.txt"}
 # Website routes served only on a site with a Webshop Store: customer account + portal pages
 # and the webshop's own pages (first path segment). Item/Item Group pages are matched by route.
 STORE_ACCOUNT_ROUTES = frozenset(
@@ -167,6 +170,8 @@ def site_endpoint(site, path, prefixes):
 	"""The route ``path`` maps to on ``site``'s hosts (None = pass through unchanged)."""
 	if not path:
 		return site_home(site)
+	if path in SEO_ENDPOINTS:
+		return SEO_ENDPOINTS[path]
 	if path.split("/", 1)[0] in prefixes:
 		raise frappe.PageDoesNotExistError
 	candidate = f"{site.route_prefix}/{path}"

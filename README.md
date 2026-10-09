@@ -17,6 +17,9 @@ Each site also gets its own SEO surface on its hosts: a `/sitemap.xml` of only i
 posts and store items, a `/robots.txt` that names it, and a canonical link and `og:url` on every page,
 all on the site's canonical host (its first non-`www` domain).
 
+Analytics are per site too: Frappe's own page-view tracking (cookieless, each view stamped with its
+site), Google Analytics 4 and Matomo, in any combination, configured on the Public Site.
+
 ## Install
 
 ```sh

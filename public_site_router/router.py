@@ -106,6 +106,16 @@ def get_request_site():
 	return frappe.get_cached_doc("Public Site", site) if site else None
 
 
+def page_site(context):
+	"""``(site, endpoint)`` for a page render on a Public Site's host, for update_website_context hooks;
+	None off a site host, on technical pages and on 404s."""
+	site = get_request_site()
+	endpoint = (getattr(frappe.local, "path", None) or context.get("path") or "").strip("/")
+	if not site or endpoint in TECHNICAL_ROUTES or context.get("http_status_code") == 404:
+		return None
+	return site, endpoint
+
+
 def get_request_store():
 	"""webshop_store_resolver hook (frappe-webshop fork): this request's Webshop Store."""
 	site = get_request_site()

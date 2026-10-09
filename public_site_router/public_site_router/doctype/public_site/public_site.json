@@ -15,7 +15,13 @@
   "webshop_store",
   "blog_category",
   "domains_section",
-  "domains"
+  "domains",
+  "analytics_section",
+  "view_tracking",
+  "ga4_measurement_id",
+  "column_break_analytics",
+  "matomo_url",
+  "matomo_site_id"
  ],
  "fields": [
   {
@@ -46,7 +52,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "First route segment this site's pages live under, e.g. zx: the page routed zx/about serves zephyrex.ca/about.",
+   "description": "First route segment this site's pages live under: the primary domain with its dots as hyphens, e.g. zephyrex-ca: the page routed zephyrex-ca/about serves zephyrex.ca/about.",
    "fieldname": "route_prefix",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -85,10 +91,44 @@
    "label": "Domains",
    "options": "Public Site Domain",
    "reqd": 1
+  },
+  {
+   "fieldname": "analytics_section",
+   "fieldtype": "Section Break",
+   "label": "Analytics"
+  },
+  {
+   "default": "1",
+   "description": "Record page views in Frappe (Web Page View, stamped with this site). Cookieless; stored in this ERP.",
+   "fieldname": "view_tracking",
+   "fieldtype": "Check",
+   "label": "Frappe View Tracking"
+  },
+  {
+   "description": "Google Analytics 4 measurement ID (G-XXXXXXXXXX). Adds the Google tag to every page of this site.",
+   "fieldname": "ga4_measurement_id",
+   "fieldtype": "Data",
+   "label": "GA4 Measurement ID"
+  },
+  {
+   "fieldname": "column_break_analytics",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Matomo base URL (https://…/). With a Site ID, adds the Matomo tracker to every page of this site.",
+   "fieldname": "matomo_url",
+   "fieldtype": "Data",
+   "label": "Matomo URL"
+  },
+  {
+   "description": "This site's ID in Matomo.",
+   "fieldname": "matomo_site_id",
+   "fieldtype": "Data",
+   "label": "Matomo Site ID"
   }
  ],
  "links": [],
- "modified": "2026-10-09 12:00:00.000000",
+ "modified": "2026-10-09 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "Public Site Router",
  "name": "Public Site",

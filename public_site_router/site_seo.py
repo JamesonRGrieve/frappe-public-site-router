@@ -9,7 +9,7 @@ import frappe
 from frappe.utils import get_url
 
 from public_site_router import seo
-from public_site_router.router import TECHNICAL_ROUTES, get_request_site, normalize_host, site_home
+from public_site_router.router import get_request_site, normalize_host, page_site, site_home
 
 ROUTED_DOCTYPES = ("Web Page", "Builder Page", "Web Form")
 IMAGE_TAGS = ("image", "og:image", "twitter:image")
@@ -63,10 +63,10 @@ def robots_txt():
 
 def update_website_context(context):
 	"""update_website_context hook: canonical link and Open Graph URL tags for a site's pages."""
-	site = get_request_site()
-	endpoint = (getattr(frappe.local, "path", None) or context.get("path") or "").strip("/")
-	if not site or endpoint in TECHNICAL_ROUTES or context.get("http_status_code") == 404:
+	page = page_site(context)
+	if not page:
 		return
+	site, endpoint = page
 	host = canonical_host(site)
 	url = seo.page_url(host, seo.clean_path(endpoint, site.route_prefix, site_home(site)))
 	context.head_html = (context.get("head_html") or "") + seo.canonical_link(url)

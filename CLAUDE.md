@@ -7,7 +7,8 @@ public websites, each isolated to its own host names. No Frappe fork: it uses Fr
 ## Model
 
 - **Public Site**: `site_name`, `enabled`, `company`, `route_prefix` (one lowercase URL segment,
-  unique), `home_route` (under the prefix, default `home`), `webshop_store` (name of a
+  unique; by convention the primary domain with its dots as hyphens, e.g. `zephyrex-ca`), analytics
+  (`view_tracking`, `ga4_measurement_id`, `matomo_url`, `matomo_site_id`), `home_route` (under the prefix, default `home`), `webshop_store` (name of a
   frappe-webshop fork `Webshop Store`, optional), `blog_category` (name of a blog-app `Blog Category`,
   optional, one site per category), `domains` (child **Public Site Domain**, host
   names normalised to lowercase, no port; unique across sites).
@@ -59,6 +60,21 @@ The host → site map is cached (`public_site_router_site_map`) and cleared on P
 - Both `www/public_site_*` pages are `no_cache` (one endpoint serves every site) and 404 off a site host.
 - Per-page titles, descriptions, `meta_image` (Open Graph card) and JSON-LD belong to the page content
   (Web Page fields and its HTML), not this app.
+
+## Analytics (`analytics.py` pure, `site_analytics.py` Frappe)
+
+Per Public Site, any combination of providers, each added to every page of that site by the
+`update_website_context` hook:
+- **Frappe view tracking** (`view_tracking`, default on): a cookieless beacon (referrer, time zone, UTM
+  tags; skipped under Do Not Track / Global Privacy Control) to `site_analytics.log_view`, which records a
+  `Web Page View` stamped with `public_site` (a custom field created by the `after_migrate` hook). Frappe's
+  own `make_view_log` cannot serve public sites: it accepts only Referers on the ERP's host and records no
+  host. The global Website Settings `enable_view_tracking` is not needed.
+- **Google Analytics 4** (`ga4_measurement_id`, validated `G-…`): the Google tag.
+- **Matomo** (`matomo_url` https + `matomo_site_id` numeric): the standard tracker.
+
+Values are validated on save and re-validated before they reach a snippet; strings are embedded with
+`json.dumps`. Saving a Public Site clears the website page cache so a change shows at once.
 
 ## Webshop stores
 

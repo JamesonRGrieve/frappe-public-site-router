@@ -12,7 +12,7 @@ from frappe.tests.utils import FrappeTestCase
 from werkzeug.test import EnvironBuilder
 from werkzeug.wrappers import Request, Response
 
-from public_site_router import site_seo
+from public_site_router import site_analytics, site_seo
 from public_site_router.router import (
 	clean_redirect,
 	clear_site_map,
@@ -575,3 +575,106 @@ class TestPublicSiteSeo(FrappeTestCase):
 		self.assertEqual(robots.status_code, 200)
 		self.assertEqual(robots.mimetype, "text/plain")
 		self.assertIn(b"Sitemap: https://zephyrex.test/sitemap.xml", robots.data)
+
+
+class TestPublicSiteAnalytics(FrappeTestCase):
+	"""Per-site analytics providers and site-stamped Frappe view tracking, against a real test site."""
+
+	GA4 = "G-B30D03ZZWZ"
+
+	def setUp(self):
+		frappe.set_user("Administrator")
+		site_analytics.ensure_custom_fields()
+		self.zx = make_site(ZX, "zx", ["zephyrex.test", "www.zephyrex.test"])
+		make_site(HUB, "3sh", ["3shub.test"])
+		make_web_page("zx/home", "ZX Home")
+		clear_site_map()
+
+	def tearDown(self):
+		on_host(None)
+		frappe.local.path = None
+		frappe.db.rollback()
+		clear_site_map()
+
+	def configure(self, **values):
+		self.zx.update(values)
+		self.zx.save()
+		clear_site_map()
+
+	def page_head(self, endpoint="zx/home"):
+		frappe.local.path = endpoint
+		context = frappe._dict({"metatags": frappe._dict(), "head_html": ""})
+		site_analytics.update_website_context(context)
+		return context.head_html
+
+	def test_ga4_id_is_validated_and_normalised(self):
+		self.configure(ga4_measurement_id=" g-b30d03zzwz ")
+		self.assertEqual(self.zx.ga4_measurement_id, self.GA4)
+		with self.assertRaises(frappe.ValidationError):
+			self.configure(ga4_measurement_id="UA-1234-1")
+
+	def test_matomo_needs_an_https_url_and_a_site_id(self):
+		self.configure(matomo_url="https://matomo.zephyrex.test", matomo_site_id="4")
+		self.assertEqual(self.zx.matomo_url, "https://matomo.zephyrex.test/")
+		with self.assertRaises(frappe.ValidationError):
+			self.configure(matomo_url="http://matomo.zephyrex.test", matomo_site_id="4")
+		with self.assertRaises(frappe.ValidationError):
+			self.configure(matomo_url="https://matomo.zephyrex.test", matomo_site_id="")
+
+	def test_configured_providers_are_on_the_sites_pages_only(self):
+		self.configure(
+			view_tracking=1,
+			ga4_measurement_id=self.GA4,
+			matomo_url="https://m.zephyrex.test",
+			matomo_site_id="4",
+		)
+		on_host("zephyrex.test")
+		head = self.page_head()
+		self.assertIn(site_analytics.LOG_ENDPOINT, head)
+		self.assertIn(self.GA4, head)
+		self.assertIn("matomo.php", head)
+		on_host("3shub.test")
+		self.assertNotIn(self.GA4, self.page_head("3sh/home"))
+		on_host("erp.example.test")
+		self.assertEqual(self.page_head(), "")
+
+	def test_no_snippets_on_technical_pages(self):
+		self.configure(ga4_measurement_id=self.GA4)
+		on_host("zephyrex.test")
+		self.assertEqual(self.page_head("404"), "")
+
+	def beacon(self, host, referer):
+		frappe.local.request = Request(
+			EnvironBuilder(
+				base_url=f"https://{host}/", method="POST", headers={"Referer": referer, "User-Agent": "test"}
+			).get_environ()
+		)
+		before = frappe.db.count("Web Page View")
+		site_analytics.log_view(
+			referrer="https://search.test/?q=private", user_tz="America/Edmonton", source="news"
+		)
+		from frappe.deferred_insert import save_to_db
+
+		save_to_db()
+		return frappe.db.count("Web Page View") - before
+
+	def test_view_is_stamped_with_its_site(self):
+		self.configure(view_tracking=1)
+		self.assertEqual(
+			self.beacon("www.zephyrex.test", "https://www.zephyrex.test/about?utm_source=news"), 1
+		)
+		view = frappe.get_last_doc("Web Page View")
+		self.assertEqual((view.path, view.public_site), ("about", ZX))
+		self.assertEqual(view.referrer, "https://search.test/")
+		self.assertEqual((view.time_zone, view.source), ("America/Edmonton", "news"))
+
+	def test_views_off_site_or_disabled_are_ignored(self):
+		self.configure(view_tracking=1)
+		self.assertEqual(self.beacon("zephyrex.test", "https://3shub.test/"), 0)
+		self.assertEqual(self.beacon("erp.example.test", "https://erp.example.test/"), 0)
+		self.assertEqual(self.beacon("zephyrex.test", "https://zephyrex.test/app/lead"), 0)
+		self.configure(view_tracking=0)
+		self.assertEqual(self.beacon("zephyrex.test", "https://zephyrex.test/"), 0)
+
+	def test_web_page_view_has_the_public_site_field(self):
+		self.assertTrue(frappe.get_meta("Web Page View").has_field("public_site"))

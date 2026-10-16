@@ -21,6 +21,10 @@ UNTRACKED_PREFIXES = ("api/", "app/", "assets/", "files/", "private/")
 # Web Page View stores the referrer in a Data field.
 REFERRER_MAX = 140
 UTM_FIELDS = ("source", "medium", "campaign", "content")
+# A site with visitor IDs keeps one anonymous ID per browser in localStorage under this key: a random
+# UUID without dashes. Other apps (a lead form) read it from the same key.
+VISITOR_STORAGE_KEY = "psr_vid"
+VISITOR_ID = re.compile(r"^[0-9a-f]{32}$")
 
 
 def valid_ga4_id(value: str) -> bool:
@@ -70,27 +74,51 @@ def matomo_snippet(url: str, site_id: str) -> str:
 	)
 
 
-def view_tracker_snippet(endpoint: str) -> str:
-	"""Cookieless page-view beacon to ``endpoint``: referrer, time zone and UTM tags only. It honours
-	Do Not Track and Global Privacy Control."""
+def clean_visitor_id(value: str | None) -> str | None:
+	"""``value`` if it is a visitor ID the tracker generates, else None."""
+	value = (value or "").strip().lower()
+	return value if VISITOR_ID.match(value) else None
+
+
+def visitor_id_script() -> str:
+	"""Tracker fragment: the browser's anonymous visitor ID (created on first use) on beacon ``b``. It runs
+	after the Do Not Track / Global Privacy Control check, so those visitors never get one."""
+	key = json.dumps(VISITOR_STORAGE_KEY)
+	return (
+		f"try{{var i=localStorage.getItem({key});if(!/^[0-9a-f]{{32}}$/.test(i||'')){{"
+		f"i=crypto.randomUUID().replace(/-/g,'');localStorage.setItem({key},i)}}b.set('visitor_id',i)}}catch(e){{}}"
+	)
+
+
+def view_tracker_snippet(endpoint: str, visitor_ids: bool = False) -> str:
+	"""Page-view beacon to ``endpoint``: referrer, time zone and UTM tags, and with ``visitor_ids`` the
+	browser's anonymous visitor ID. No cookies either way. It honours Do Not Track and Global Privacy
+	Control."""
 	return (
 		"<script>(function(){try{if(navigator.doNotTrack==='1'||navigator.globalPrivacyControl)return;"
 		"var q=new URLSearchParams(location.search),b=new URLSearchParams();b.set('referrer',document.referrer||'');"
 		"try{b.set('user_tz',Intl.DateTimeFormat().resolvedOptions().timeZone)}catch(e){}"
 		f"{json.dumps(list(UTM_FIELDS))}.forEach(function(k){{var v=q.get('utm_'+k);if(v)b.set(k,v)}});"
+		f"{visitor_id_script() if visitor_ids else ''}"
 		f"var u={json.dumps(endpoint)};if(navigator.sendBeacon)navigator.sendBeacon(u,b);"
 		"else fetch(u,{method:'POST',body:b,keepalive:true});}catch(e){}})();</script>"
 	)
 
 
 def head_snippets(
-	*, view_tracking: bool, ga4_measurement_id: str, matomo_url: str, matomo_site_id: str, log_endpoint: str
+	*,
+	view_tracking: bool,
+	ga4_measurement_id: str,
+	matomo_url: str,
+	matomo_site_id: str,
+	log_endpoint: str,
+	visitor_ids: bool = False,
 ) -> str:
 	"""Every configured provider's snippet for one site. A half-configured or invalid provider adds
 	nothing (Public Site validation rejects those values on save)."""
 	snippets = []
 	if view_tracking:
-		snippets.append(view_tracker_snippet(log_endpoint))
+		snippets.append(view_tracker_snippet(log_endpoint, visitor_ids))
 	if valid_ga4_id(ga4_measurement_id):
 		snippets.append(ga4_snippet(ga4_measurement_id))
 	if matomo_base(matomo_url) and valid_matomo_site_id(matomo_site_id):

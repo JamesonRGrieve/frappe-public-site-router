@@ -89,6 +89,27 @@ class TestViewTracker:
 		assert '["source", "medium", "campaign", "content"]' in snippet
 		assert "cookie" not in snippet and "localStorage" not in snippet
 
+	def test_visitor_ids_add_a_stored_id_after_the_privacy_check(self):
+		snippet = analytics.view_tracker_snippet(ENDPOINT, visitor_ids=True)
+		assert set(re.findall(r"b\.set\('(\w+)'", snippet)) == {"referrer", "user_tz", "visitor_id"}
+		assert 'localStorage.getItem("psr_vid")' in snippet
+		assert "crypto.randomUUID()" in snippet
+		assert "cookie" not in snippet
+		assert snippet.index("globalPrivacyControl") < snippet.index("localStorage")
+		assert snippet.index("visitor_id") < snippet.index("sendBeacon")
+
+
+class TestVisitorId:
+	def test_accepts_the_trackers_ids(self):
+		assert (
+			analytics.clean_visitor_id(" 0123456789ABCDEF0123456789abcdef ")
+			== "0123456789abcdef0123456789abcdef"
+		)
+
+	@pytest.mark.parametrize("value", [None, "", "short", "g" * 32, "0123456789abcdef" * 3, "<script>" * 4])
+	def test_rejects_anything_else(self, value):
+		assert analytics.clean_visitor_id(value) is None
+
 
 class TestHeadSnippets:
 	def snippets(self, **overrides):
@@ -104,6 +125,11 @@ class TestHeadSnippets:
 	def test_every_configured_provider(self):
 		html = self.snippets()
 		assert ENDPOINT in html and "G-B30D03ZZWZ" in html and "matomo.php" in html
+
+	def test_visitor_ids_only_when_enabled(self):
+		assert "psr_vid" not in self.snippets()
+		assert "psr_vid" in self.snippets(visitor_ids=True)
+		assert "psr_vid" not in self.snippets(view_tracking=False, visitor_ids=True)
 
 	def test_nothing_configured_adds_nothing(self):
 		assert (

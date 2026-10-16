@@ -18,7 +18,9 @@ posts and store items, a `/robots.txt` that names it, and a canonical link and `
 all on the site's canonical host (its first non-`www` domain).
 
 Analytics are per site too: Frappe's own page-view tracking (cookieless, each view stamped with its
-site), Google Analytics 4 and Matomo, in any combination, configured on the Public Site.
+site), Google Analytics 4 and Matomo, in any combination, configured on the Public Site. A site can also
+give each browser an anonymous visitor ID (off by default; never under Do Not Track), so a lead form
+can link a visitor's earlier pages to their enquiry.
 
 ## Install
 

@@ -21,6 +21,7 @@
   "favicon",
   "analytics_section",
   "view_tracking",
+  "visitor_ids",
   "ga4_measurement_id",
   "column_break_analytics",
   "matomo_url",
@@ -119,6 +120,14 @@
    "label": "Frappe View Tracking"
   },
   {
+   "default": "0",
+   "depends_on": "view_tracking",
+   "description": "Give each browser an anonymous visitor ID (in its localStorage, never a cookie; none under Do Not Track or Global Privacy Control), recorded on its page views, so a lead form can link a visitor's earlier pages to their enquiry. Say so in the site's privacy notice.",
+   "fieldname": "visitor_ids",
+   "fieldtype": "Check",
+   "label": "Visitor IDs"
+  },
+  {
    "description": "Google Analytics 4 measurement ID (G-XXXXXXXXXX). Adds the Google tag to every page of this site.",
    "fieldname": "ga4_measurement_id",
    "fieldtype": "Data",
@@ -142,7 +151,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-09 17:00:00.000000",
+ "modified": "2026-10-16 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Public Site Router",
  "name": "Public Site",

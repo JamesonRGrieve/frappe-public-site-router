@@ -48,6 +48,7 @@ def update_website_context(context):
 		matomo_url=site.get("matomo_url") or "",
 		matomo_site_id=site.get("matomo_site_id") or "",
 		log_endpoint=LOG_ENDPOINT,
+		visitor_ids=bool(site.get("visitor_ids")),
 	)
 	if snippets:
 		context.head_html = (context.get("head_html") or "") + snippets
@@ -55,8 +56,11 @@ def update_website_context(context):
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])
 @rate_limit(limit=VIEWS_PER_MINUTE, seconds=SECONDS_PER_MINUTE)
-def log_view(referrer=None, user_tz=None, source=None, medium=None, campaign=None, content=None):
-	"""Record one page view on a public site's host (the tracker's beacon); anything else is ignored."""
+def log_view(
+	referrer=None, user_tz=None, source=None, medium=None, campaign=None, content=None, visitor_id=None
+):
+	"""Record one page view on a public site's host (the tracker's beacon); anything else is ignored. The
+	visitor ID is kept only on a site with visitor IDs on."""
 	site = get_request_site()
 	if not site or not site.get("view_tracking"):
 		return
@@ -76,6 +80,7 @@ def log_view(referrer=None, user_tz=None, source=None, medium=None, campaign=Non
 			"medium": (medium or "").lower(),
 			"campaign": campaign,
 			"content": content,
+			"visitor_id": analytics.clean_visitor_id(visitor_id) if site.get("visitor_ids") else None,
 		}
 	)
 	view.deferred_insert()

@@ -8,7 +8,7 @@ public websites, each isolated to its own host names. No Frappe fork: it uses Fr
 
 - **Public Site**: `site_name`, `enabled`, `company`, `route_prefix` (one lowercase URL segment,
   unique; by convention the primary domain with its dots as hyphens, e.g. `zephyrex-ca`), analytics
-  (`view_tracking`, `ga4_measurement_id`, `matomo_url`, `matomo_site_id`), `home_route` (under the prefix, default `home`), `webshop_store` (name of a
+  (`view_tracking`, `visitor_ids`, `ga4_measurement_id`, `matomo_url`, `matomo_site_id`), `home_route` (under the prefix, default `home`), `webshop_store` (name of a
   frappe-webshop fork `Webshop Store`, optional), `blog_category` (name of a blog-app `Blog Category`,
   optional, one site per category), `domains` (child **Public Site Domain**, host
   names normalised to lowercase, no port; unique across sites).
@@ -72,6 +72,11 @@ Per Public Site, any combination of providers, each added to every page of that 
   `Web Page View` stamped with `public_site` (a custom field created by the `after_migrate` hook). Frappe's
   own `make_view_log` cannot serve public sites: it accepts only Referers on the ERP's host and records no
   host. The global Website Settings `enable_view_tracking` is not needed.
+  - **Visitor IDs** (`visitor_ids`, default off, needs `view_tracking`): the tracker keeps an anonymous
+    32-hex ID per browser in `localStorage["psr_vid"]` (created after the DNT/GPC check, so those
+    visitors never get one; no cookie) and sends it; `log_view` stores it in `Web Page View.visitor_id`
+    only on such a site. A lead form reads the same key so a CRM app (e.g. frappe-crm-heat-tracking)
+    can link the visitor's pages to the lead.
 - **Google Analytics 4** (`ga4_measurement_id`, validated `G-…`): the Google tag.
 - **Matomo** (`matomo_url` https + `matomo_site_id` numeric): the standard tracker.
 

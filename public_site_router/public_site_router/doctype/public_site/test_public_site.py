@@ -12,7 +12,7 @@ from frappe.tests.utils import FrappeTestCase
 from werkzeug.test import EnvironBuilder
 from werkzeug.wrappers import Request, Response
 
-from public_site_router import site_analytics, site_seo
+from public_site_router import site_analytics, site_chrome, site_seo
 from public_site_router.router import (
 	clean_redirect,
 	clear_site_map,
@@ -622,6 +622,57 @@ class TestPublicSiteSeo(FrappeTestCase):
 		self.assertEqual(robots.status_code, 200)
 		self.assertEqual(robots.mimetype, "text/plain")
 		self.assertIn(b"Sitemap: https://zephyrex.test/sitemap.xml", robots.data)
+
+
+class TestPublicSiteChrome(FrappeTestCase):
+	"""Public Site pages render without Frappe's standard navbar; other hosts keep it."""
+
+	def setUp(self):
+		frappe.set_user("Administrator")
+		make_site(ZX, "zx", ["zephyrex.test"])
+		for route, title in (("zx/home", "ZX Home"), ("shared-legal", "Shared Legal")):
+			make_web_page(route, title)
+		clear_site_map()
+
+	def tearDown(self):
+		on_host(None)
+		frappe.db.rollback()
+		clear_site_map()
+
+	def test_site_host_pages_use_the_base_without_navbar(self):
+		on_host("zephyrex.test")
+		context = frappe._dict(base_template_path=site_chrome.FRAPPE_BASE)
+		site_chrome.update_website_context(context)
+		self.assertEqual(context.base_template_path, site_chrome.PUBLIC_SITE_BASE)
+
+	def test_other_hosts_keep_frappes_base(self):
+		on_host("erp.example.test")
+		context = frappe._dict(base_template_path=site_chrome.FRAPPE_BASE)
+		site_chrome.update_website_context(context)
+		self.assertEqual(context.base_template_path, site_chrome.FRAPPE_BASE)
+
+	def test_a_pages_own_base_template_is_kept(self):
+		on_host("zephyrex.test")
+		context = frappe._dict(base_template_path="some_app/templates/own_base.html")
+		site_chrome.update_website_context(context)
+		self.assertEqual(context.base_template_path, "some_app/templates/own_base.html")
+
+	def render(self, host, path):
+		from frappe.website.serve import get_response
+
+		on_host(host)
+		frappe.local.path = path
+		return get_response(path).data.decode()
+
+	def test_rendered_site_page_and_its_not_found_page_have_no_navbar(self):
+		for path in ("", "no-such-page"):
+			html = self.render("zephyrex.test", path)
+			self.assertNotIn('class="navbar', html, path or "/")
+			self.assertNotIn("/all-products", html, path or "/")
+			self.assertIn("<body", html, path or "/")
+
+	def test_rendered_page_off_site_keeps_the_navbar(self):
+		self.assertIn('class="navbar', self.render("erp.example.test", "shared-legal"))
 
 
 class TestPublicSiteAnalytics(FrappeTestCase):

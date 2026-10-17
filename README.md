@@ -22,6 +22,10 @@ site), Google Analytics 4 and Matomo, in any combination, configured on the Publ
 give each browser an anonymous visitor ID (off by default; never under Do Not Track), so a lead form
 can link a visitor's earlier pages to their enquiry.
 
+Sites bring their own header, so their pages are rendered without Frappe's standard navbar (whose links
+to the ERP's shop, cart and login would otherwise sit in every page's HTML). A missing page on a site's
+host is a real 404.
+
 ## Install
 
 ```sh

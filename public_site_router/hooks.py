@@ -21,11 +21,12 @@ website_path_resolver = "public_site_router.router.resolve_path"
 # page the router refused its real 404 status (Frappe renders a resolver's refusal as a 200 Not Found).
 after_request = ["public_site_router.router.clean_redirect", "public_site_router.router.not_found_status"]
 
-# Canonical link, og:url and og:site_name naming the request's site's canonical host, and the site's
-# analytics providers (Frappe view tracking, GA4, Matomo).
+# Canonical link, og:url and og:site_name naming the request's site's canonical host, the site's
+# analytics providers (Frappe view tracking, GA4, Matomo), and the base template without Frappe's navbar.
 update_website_context = [
 	"public_site_router.site_seo.update_website_context",
 	"public_site_router.site_analytics.update_website_context",
+	"public_site_router.site_chrome.update_website_context",
 ]
 
 # Web Page View's public_site field (views stamped with their site).

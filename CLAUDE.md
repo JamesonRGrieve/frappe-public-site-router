@@ -63,6 +63,15 @@ The host → site map is cached (`public_site_router_site_map`) and cleared on P
 - Per-page titles, descriptions, `meta_image` (Open Graph card) and JSON-LD belong to the page content
   (Web Page fields and its HTML), not this app.
 
+## Page chrome (`site_chrome.py`)
+
+Every public site brings its own header, so on a Public Site host the `update_website_context` hook
+renders pages (their Not Found page included) on `templates/public_site_base.html`: Frappe's
+`base.html` with the `navbar` block emptied. Frappe's standard navbar would otherwise stay in the HTML
+(hidden by the site's CSS) and hand crawlers the ERP's own links (`/all-products`, `/cart`, `/login`),
+which are 404s on a site host. A page that set its own `base_template_path` keeps it; hosts outside a
+Public Site keep Frappe's chrome.
+
 ## Analytics (`analytics.py` pure, `site_analytics.py` Frappe)
 
 Per Public Site, any combination of providers, each added to every page of that site by the

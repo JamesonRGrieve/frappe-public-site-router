@@ -17,8 +17,9 @@ required_apps = ["frappe"]
 # website_path_resolver; router.resolve_path then calls those handlers itself.
 website_path_resolver = "public_site_router.router.resolve_path"
 
-# Rewrites a redirect to a site's prefixed route into its clean URL on that site's hosts.
-after_request = ["public_site_router.router.clean_redirect"]
+# Rewrites a redirect to a site's prefixed route into its clean URL on that site's hosts, and gives a
+# page the router refused its real 404 status (Frappe renders a resolver's refusal as a 200 Not Found).
+after_request = ["public_site_router.router.clean_redirect", "public_site_router.router.not_found_status"]
 
 # Canonical link, og:url and og:site_name naming the request's site's canonical host, and the site's
 # analytics providers (Frappe view tracking, GA4, Matomo).

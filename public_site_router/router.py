@@ -32,6 +32,8 @@ import frappe
 from frappe.website.path_resolver import resolve_path as frappe_resolve_path
 
 SITE_MAP_CACHE_KEY = "public_site_router_site_map"
+HTTP_OK = 200
+HTTP_NOT_FOUND = 404
 OWN_RESOLVER = "public_site_router.router.resolve_path"
 ROUTED_DOCTYPES = ("Web Page", "Builder Page")
 # Website routes every Public Site host serves besides its own pages.
@@ -195,12 +197,25 @@ def site_endpoint(site, path, prefixes):
 def resolve_path(path):
 	"""website_path_resolver hook. A disabled site's hosts serve nothing (404), so a domain can go
 	live in DNS before its site launches without exposing the ERP's own website on it."""
-	site = get_request_site()
-	if site:
-		path = site_endpoint(site, path, get_site_map()["prefixes"]) or path
-	elif get_request_host() in get_site_map().get("closed_hosts", {}):
-		raise frappe.PageDoesNotExistError
+	try:
+		site = get_request_site()
+		if site:
+			path = site_endpoint(site, path, get_site_map()["prefixes"]) or path
+		elif get_request_host() in get_site_map().get("closed_hosts", {}):
+			raise frappe.PageDoesNotExistError
+	except frappe.PageDoesNotExistError:
+		# Frappe renders a resolver's PageDoesNotExistError as its Not Found page with the request's
+		# default status (200); not_found_status gives that response its real 404.
+		frappe.local.flags.public_site_not_found = True
+		raise
 	return resolve_with_other_resolvers(path)
+
+
+def not_found_status(response, request):
+	"""after_request hook: a page this router refused is a 404, not a 200 Not Found page, so search
+	engines drop it instead of indexing a soft 404."""
+	if frappe.local.flags.get("public_site_not_found") and response.status_code == HTTP_OK:
+		response.status_code = HTTP_NOT_FOUND
 
 
 def clean_location(site, location):

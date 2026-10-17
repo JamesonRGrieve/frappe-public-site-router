@@ -20,6 +20,7 @@ from public_site_router.router import (
 	get_request_site,
 	get_request_store,
 	normalize_host,
+	not_found_status,
 	resolve_path,
 )
 
@@ -32,6 +33,7 @@ HUB_STORE = "_Test 3S Hub Store"
 def on_host(host):
 	"""Make the current request a real Werkzeug request for ``host`` (as Frappe serves it)."""
 	frappe.local.request = Request(EnvironBuilder(base_url=f"http://{host}/").get_environ()) if host else None
+	frappe.local.flags.pop("public_site_not_found", None)
 
 
 def make_site(name, prefix, domains, company=None, webshop_store=None, blog_category=None):
@@ -248,6 +250,22 @@ class TestPublicSiteRouting(FrappeTestCase):
 			response = Response(status=302, headers={"Location": location})
 			clean_redirect(response, frappe.local.request)
 			self.assertEqual(response.headers["Location"], expected)
+
+	def test_refused_page_is_served_as_404(self):
+		on_host("3shub.test")
+		with self.assertRaises(frappe.PageDoesNotExistError):
+			resolve_path("infrastructure/firewalls")
+		response = Response(status=200)
+		not_found_status(response, frappe.local.request)
+		self.assertEqual(response.status_code, 404)
+
+	def test_served_page_keeps_its_status(self):
+		on_host("zephyrex.test")
+		resolve_path("infrastructure/firewalls")
+		for status in (200, 302):
+			response = Response(status=status)
+			not_found_status(response, frappe.local.request)
+			self.assertEqual(response.status_code, status)
 
 	def test_redirect_untouched_off_site_or_not_redirect(self):
 		on_host("erp.example.test")

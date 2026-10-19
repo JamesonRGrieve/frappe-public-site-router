@@ -25,6 +25,30 @@ class TestIsStandalone:
 		assert not chrome.is_standalone(1, "Web Page", "templates/custom.html")
 
 
+class TestAddHeadHtml:
+	def test_frappe_page_gets_it_in_head_html(self):
+		context = {"head_html": "<meta a>"}
+		chrome.add_head_html(context, "<link b>")
+		assert context == {"head_html": "<meta a><link b>"}
+
+	def test_builder_page_gets_it_in_its_own_head_too(self):
+		# Builder fills _head_html (its page and settings head HTML) before the hooks run.
+		context = {"_head_html": "<style>x</style>"}
+		chrome.add_head_html(context, "<link b>")
+		assert context == {"_head_html": "<style>x</style><link b>", "head_html": "<link b>"}
+
+	def test_builder_page_with_an_empty_head(self):
+		context = {"_head_html": None}
+		chrome.add_head_html(context, "<link b>")
+		assert context["_head_html"] == "<link b>"
+
+	@pytest.mark.parametrize("html", ["", None])
+	def test_nothing_to_add_leaves_the_context_alone(self, html):
+		context = {"_head_html": "h"}
+		chrome.add_head_html(context, html)
+		assert context == {"_head_html": "h"}
+
+
 HEADER = '<header class="h"><a href="#main">Skip</a><nav>Menu</nav></header>'
 FOOTER = "<footer>Foot</footer>"
 

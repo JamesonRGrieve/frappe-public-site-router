@@ -9,7 +9,7 @@ import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 from frappe.rate_limiter import rate_limit
 
-from public_site_router import analytics
+from public_site_router import analytics, chrome
 from public_site_router.router import get_request_site, page_site
 
 LOG_ENDPOINT = "/api/method/public_site_router.site_analytics.log_view"
@@ -57,8 +57,7 @@ def update_website_context(context):
 		visitor_ids=bool(site.get("visitor_ids")),
 		privacy_url=privacy_url(site),
 	)
-	if snippets:
-		context.head_html = (context.get("head_html") or "") + snippets
+	chrome.add_head_html(context, snippets)
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])

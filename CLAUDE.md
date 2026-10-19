@@ -80,6 +80,10 @@ The host → site map is cached (`public_site_router_site_map`) and cleared on P
 
 ## Page chrome (`site_chrome.py`)
 
+**Builder Pages** render on Builder's own template, which prints its `_head_html` and not Frappe's `head_html`, and
+Builder fills it before the `update_website_context` hooks run. So every head addition (canonical, favicon, analytics)
+goes through `chrome.add_head_html`, which appends to `head_html` and, on a Builder Page, to `_head_html` too.
+
 Every public site brings its own header, so on a Public Site host the `update_website_context` hook
 renders pages (their Not Found page included) on `templates/public_site_base.html`: Frappe's
 `base.html` with the `navbar` block emptied. Frappe's standard navbar would otherwise stay in the HTML

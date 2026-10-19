@@ -9,7 +9,7 @@ the ERP's host moved onto it."""
 import frappe
 from frappe.utils import get_url
 
-from public_site_router import seo
+from public_site_router import chrome, seo
 from public_site_router.router import (
 	get_request_site,
 	normalize_host,
@@ -102,7 +102,7 @@ def update_website_context(context):
 		# base.html renders `favicon` as the tab icon; the same image is the home-screen icon.
 		context.favicon = seo.site_asset_url(site.favicon, erp_hosts, host)
 		head += seo.touch_icon_link(context.favicon)
-	context.head_html = (context.get("head_html") or "") + head
+	chrome.add_head_html(context, head)
 	tags = context.get("metatags")
 	if tags is None:
 		return

@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Which Public Site pages render standalone (pure logic; ``site_chrome`` applies it).
+"""Which Public Site pages render standalone, and how the router's head markup reaches every page (pure logic;
+``site_chrome``, ``site_seo`` and ``site_analytics`` apply it).
 
 A standalone page carries only what its own content brings: Frappe's website stylesheets and scripts, its standard
 footer and its page wrapper are left out."""
@@ -12,6 +13,9 @@ STANDALONE_DOCTYPES = frozenset({"Web Page"})
 # A top-level element of a page's content marked with this attribute is main content. Page Builder renders each block
 # on its own, so a page of header / section / footer blocks can't have one block wrap the others in <main>.
 MAIN_CONTENT_ATTR = "data-main-content"
+# A Builder Page renders its own <head> from this context key, which Builder fills before the update_website_context
+# hooks run, and ignores Frappe's ``head_html``.
+BUILDER_HEAD_HTML = "_head_html"
 VOID = frozenset(
 	{"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
 )
@@ -62,6 +66,16 @@ def wrap_main(html):
 		return html
 	first, last = marked[0][0], marked[-1][1]
 	return f'{html[:first]}<main id="main">{html[first:last]}</main>{html[last:]}'
+
+
+def add_head_html(context, html):
+	"""Append ``html`` (canonical link, favicon, analytics) to a page's head: ``head_html`` for Frappe's templates, and
+	``_head_html`` too on a Builder Page, whose template prints only that."""
+	if not html:
+		return
+	context["head_html"] = (context.get("head_html") or "") + html
+	if BUILDER_HEAD_HTML in context:
+		context[BUILDER_HEAD_HTML] = (context.get(BUILDER_HEAD_HTML) or "") + html
 
 
 def is_standalone(standalone_pages, doctype, own_template):

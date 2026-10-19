@@ -89,8 +89,9 @@ Public Site keep Frappe's chrome.
 
 **Standalone Pages** (`standalone_pages`, default off): for sites whose pages bring all their own CSS and
 JS. Their Web Pages (`chrome.is_standalone`, pure) render on `templates/standalone_web_page.html`
-(Frappe's Web Page template without its `<main>` wrapper and breadcrumbs: the site's content brings its
-own landmarks), and the base template leaves out Frappe's website stylesheet, `web_include_css/js/icons`
+(Frappe's Web Page template without its breadcrumbs, and without its `<main>` wrapper when the content brings
+its own `<main>`; content without one, e.g. a page of several section blocks that Page Builder renders one by
+one, is wrapped in `<main id="main">` so the page keeps its main landmark), and the base template leaves out Frappe's website stylesheet, `web_include_css/js/icons`
 (the ERPNext, webshop and blog bundles, icon sprites), `frappe-web.bundle.js` with `frappe.boot`, and the
 standard footer. The head keeps `head_html` (canonical, favicon, analytics) and `frappe.csrf_token` still
 lands on the `window.frappe` object base.html creates. Login, webshop, blog and Not Found pages keep

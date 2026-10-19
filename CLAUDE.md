@@ -133,6 +133,13 @@ Frappe caches rendered pages by endpoint. Endpoints here are host-specific (`<pr
 site's cached HTML is never served on another host. Shared routes whose content varies by host
 (webshop product/listing pages) are made `no_cache` by the fork in multi-store mode.
 
+## Deploying
+
+A release that adds or changes a hook (`after_request`, `update_website_context`, …) only takes effect once
+frappe's cached hook map (`app_hooks`) is rebuilt from the new code. The old workers re-cache it during build and
+migrate, so clear the caches after the units restart (the tofu `frappe_app` provider does since 63f83277), then
+check the hook's effect on a live response (e.g. the security headers), not just that the commit is installed.
+
 ## Testing
 
 `bench --site <site> run-tests --app public_site_router` (real DB). The webshop test class runs

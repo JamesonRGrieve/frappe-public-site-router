@@ -30,6 +30,11 @@ their own CSS and JavaScript can turn on **Standalone Pages**: its Web Pages the
 render-blocking website bundles (Frappe, ERPNext, webshop, blog). A missing page on a site's host is a
 real 404, shown as the site's own Not Found page (with its header and menu) when it names one.
 
+The ERP's own apps can have host names too: an **App Host** serves one app (say `crm.example.com` for
+`/crm`) with one sign-in on the ERP's login host. A signed-out visitor is sent to sign in there and comes back
+with a single-use, 60-second token for that host only; the session cookie stays host-only, so it never reaches
+other names in the zone. The desk's app links point at each app's host.
+
 ## Install
 
 ```sh

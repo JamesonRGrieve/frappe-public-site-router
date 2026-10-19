@@ -1,0 +1,85 @@
+{
+ "actions": [],
+ "autoname": "field:host",
+ "creation": "2026-10-19 14:00:00.000000",
+ "description": "One app of this site served on its own host name, e.g. crm.example.com for /crm. / on the host opens the app; a signed-out visitor signs in on the login host and is handed back with a single-use token. The session cookie stays host-only.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "host",
+  "enabled",
+  "label",
+  "column_break_route",
+  "app_route",
+  "login_host"
+ ],
+ "fields": [
+  {
+   "description": "Host name this app answers on, e.g. crm.example.com (no scheme, no port). Not a Public Site domain.",
+   "fieldname": "host",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Host",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Enabled"
+  },
+  {
+   "description": "Name shown for this app, optional.",
+   "fieldname": "label",
+   "fieldtype": "Data",
+   "label": "Label"
+  },
+  {
+   "fieldname": "column_break_route",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "First URL segment of the app, e.g. crm for /crm.",
+   "fieldname": "app_route",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "App Route",
+   "reqd": 1
+  },
+  {
+   "description": "Host that holds the sign-in and the desk, e.g. erp.example.com.",
+   "fieldname": "login_host",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Login Host",
+   "reqd": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-19 14:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Public Site Router",
+ "name": "App Host",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

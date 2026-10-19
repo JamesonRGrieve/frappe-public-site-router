@@ -34,6 +34,7 @@ import frappe
 from frappe.website.path_resolver import resolve_path as frappe_resolve_path
 
 from public_site_router import seo
+from public_site_router.app_routing import normalize_host
 
 SITE_MAP_CACHE_KEY = "public_site_router_site_map"
 HTTP_OK = 200
@@ -68,10 +69,6 @@ STORE_PAGE_SEGMENTS = frozenset(
 	{"cart", "all-products", "shop-by-category", "product_search", "order", "wishlist", "customer_reviews"}
 )
 STORE_GENERATOR_DOCTYPES = ("Website Item", "Item Group")
-
-
-def normalize_host(host):
-	return (host or "").split(":", 1)[0].strip().lower().rstrip(".")
 
 
 def get_site_map():

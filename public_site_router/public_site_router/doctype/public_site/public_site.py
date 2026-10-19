@@ -69,6 +69,12 @@ class PublicSite(Document):
 			frappe.throw(
 				_("Domain {0} already belongs to site {1}.").format(taken[0].domain, taken[0].parent)
 			)
+		# An App Host serves an app of the ERP, and its login host holds the ERP's sign-in: neither is a website.
+		if mine and frappe.db.table_exists("App Host"):
+			for field in ("host", "login_host"):
+				host = frappe.db.get_value("App Host", {field: ["in", mine]}, field)
+				if host:
+					frappe.throw(_("Domain {0} is an App Host or an App Host's Login Host.").format(host))
 
 	def validate_webshop_store(self):
 		if not self.webshop_store:

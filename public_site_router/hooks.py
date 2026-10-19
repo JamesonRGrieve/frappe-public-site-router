@@ -32,7 +32,16 @@ update_website_context = [
 	"public_site_router.site_seo.update_website_context",
 	"public_site_router.site_analytics.update_website_context",
 	"public_site_router.site_chrome.update_website_context",
+	# On a login or app host: the desk's apps screen / app switcher link each app with an App Host on its host.
+	"public_site_router.app_hosts.update_website_context",
 ]
+
+# App Hosts: on an app's own host, / opens the app and a signed-out visitor is handed off to the login host.
+before_request = ["public_site_router.app_hosts.before_request"]
+
+# Frappe apps' own app menus (e.g. CRM's) read frappe.apps.get_apps; on a login or app host it links each app with
+# an App Host on its host.
+override_whitelisted_methods = {"frappe.apps.get_apps": "public_site_router.app_hosts.get_apps"}
 
 # Web Page View's public_site field (views stamped with their site).
 after_migrate = ["public_site_router.site_analytics.ensure_custom_fields"]

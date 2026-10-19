@@ -14,6 +14,7 @@ public websites, each isolated to its own host names. No Frappe fork: it uses Fr
   `privacy_route` (routes under the prefix; see **Routing** and **Analytics**), `security_headers`, `content_signal`,
   `llms_txt` and `bing_site_auth` (see **SEO**), `domains` (child **Public Site Domain**, host
   names normalised to lowercase, no port; unique across sites).
+- **App Host** (named by `host`): `host`, `app_route`, `login_host`, `enabled`, `label`; see **App Hosts**.
 
 ## Routing (`router.py`)
 
@@ -128,6 +129,53 @@ Per Public Site, any combination of providers, each added to every page of that 
 Values are validated on save and re-validated before they reach a snippet; strings are embedded with
 `json.dumps`. Saving a Public Site clears the website page cache so a change shows at once.
 
+## App Hosts (`app_routing.py` pure, `app_hosts.py` Frappe)
+
+The site's apps on their own host names with one sign-in, e.g. OMG's ERP (desk and login on
+`erp.obsessedmediagroup.ca`) serving `crm.` → `/crm`, `hr.` → `/hr`, `lms.`, `insights.`, `builder.`.
+
+- **Model**: `host` (unique, a plain DNS name, normalised like Public Site domains), `app_route` (one lowercase segment,
+  not one Frappe serves itself: `api`, `assets`, `files`, `desk`, `login`, … `app_routing.RESERVED_ROUTES`), `login_host`
+  (the host holding the sign-in; differs from `host`, is not itself an App Host, and an App Host's host is no other's
+  login host), `enabled`, `label`. One host per app route per login host. Neither host nor login host may be a Public
+  Site domain (checked on both doctypes). The enabled-host map is cached (`public_site_router_app_host_map`), cleared on
+  save/delete.
+- **Routing** (`before_request` hook, raising a Werkzeug `HTTPException` carrying a 302, which `frappe.app.application`
+  returns as the response): on an enabled App Host, `GET`/`HEAD /` → `/<app_route>` (query kept); a signed-out page
+  request (`GET`/`HEAD`, `/<app_route>[/...]`, not XHR, Accept naming HTML) → the login host's `handoff`. Everything
+  else (the app's API calls, `/assets`, `/files`, `socket.io`, the accept endpoint, desk links, other methods) passes.
+- **Handoff**: the app host sets a host-only, HttpOnly anti-forgery state cookie (`psr_handoff_state`, reused while
+  valid) and sends the visitor to `https://<login_host>/api/method/public_site_router.app_hosts.handoff?target=&next=&state=`.
+  `handoff` (GET, guest-allowed) answers only on the login host of an enabled App Host named by `target` (else 403). A
+  signed-out visitor goes to `/login?redirect-to=<this handoff, relative>`: Frappe keeps `redirect-to` through
+  password login (login.js `sanitise_redirect`), the email link and social login (it is the OAuth `state`'s stored
+  redirect). A signed-in one gets a token (`secrets.token_urlsafe(32)`, in Redis for 60 s with the sid, user, target,
+  next and state) and goes to `https://<target>/api/method/public_site_router.app_hosts.accept?token=`.
+- **Accept** (GET, guest-allowed, on the app host): takes the token with `GETDEL` (single use, even on failure), and
+  answers 403 unless it exists, names this host, this host is an enabled App Host and the state cookie matches
+  (constant-time). It then resumes the session through Frappe's own `LoginManager` with the sid in `form_dict` (as
+  `frappe.www.login.login_via_token` does), so Frappe validates it (expiry, session end, IP restriction) and sets its
+  own cookies on this host: `sid` (HttpOnly, `max_age` = session expiry) and `system_user`, `full_name`, `user_id`,
+  `user_image`, `user_lang`, all host-only, `SameSite=Lax`, `Secure` on https. A session that is gone or another
+  user's is a 403. `next` is followed only as a same-host relative path (one leading `/`, no scheme or host, no
+  backslash, control character or space); otherwise `/<app_route>`.
+- **Why not a parent-domain cookie**: `Domain=.obsessedmediagroup.ca` would send staff session cookies to every name in
+  the zone, including the third-party `link.` CNAME (SMTP2GO click tracking) and the client WordPress dev subdomains.
+  The session is server-side and valid on any host of the site, so only the cookie is copied, per host, on demand.
+- **Logout** deletes the session server-side (`delete_session`), so every host's cookie for it stops working at once:
+  the next request on an app host resumes as Guest (Frappe clears that host's cookies) and hands off again, to a login
+  host that is signed out too. Nothing else is needed.
+- **Desk links**: on a login host or an app host (never elsewhere), the `update_website_context` hook rewrites the
+  boot data the desk and website pages render from (`boot.app_data[].app_route`: apps screen and app switcher;
+  `boot.apps_data.apps[].route`: website pages' Apps link) to `https://<host>/<route>` for apps with an App Host of that
+  login host, on copies. `override_whitelisted_methods` replaces `frappe.apps.get_apps` (what Frappe apps' own app
+  menus, e.g. CRM's, call) with the same rewrite. `extend_bootinfo` / `boot_session` can't do it: `apps_data` is set
+  after `extend_bootinfo` runs, and `boot_session` output is cached per user, not per host. The desk's apps screen
+  opens absolute routes in a new tab (desktop.js); Builder's own app menu (`builder.api.get_apps`, Redis-cached)
+  keeps relative routes.
+- **Deploying**: each app host must reach this Frappe site (DNS, TLS, the proxy, and Frappe's site resolution by host:
+  a bench domain or `X-Frappe-Site-Name`).
+
 ## Webshop stores
 
 Implements the frappe-webshop fork's `webshop_store_resolver` hook: the request's site's
@@ -151,5 +199,5 @@ check the hook's effect on a live response (e.g. the security headers), not just
 `bench --site <site> run-tests --app public_site_router` (real DB). The webshop test class runs
 end-to-end through the fork when `webshop` is installed, and is skipped otherwise.
 
-The pure SEO logic is unit-tested without a bench: `uv run --no-project --with pytest python -I -m pytest`
+The pure logic (SEO, analytics, chrome, App Hosts) is unit-tested without a bench: `uv run --no-project --with pytest python -I -m pytest`
 (`tests/`). Lint: `uvx ruff format --check . && uvx ruff check .`

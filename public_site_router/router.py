@@ -41,8 +41,9 @@ HTTP_OK = 200
 HTTP_NOT_FOUND = 404
 OWN_RESOLVER = "public_site_router.router.resolve_path"
 ROUTED_DOCTYPES = ("Web Page", "Builder Page")
-# Website routes every Public Site host serves besides its own pages.
-TECHNICAL_ROUTES = frozenset({"404", "error", "message", "website_script.js"})
+# Website routes every Public Site host serves besides its own pages. builder_assets/tokens.css is Builder's
+# site-wide colour-token stylesheet, which every Builder Page links.
+TECHNICAL_ROUTES = frozenset({"404", "error", "message", "website_script.js", "builder_assets/tokens.css"})
 # A site host's sitemap and robots.txt are the site's own (www/public_site_*, built in site_seo).
 SEO_ENDPOINTS = {
 	"sitemap.xml": "public_site_sitemap.xml",

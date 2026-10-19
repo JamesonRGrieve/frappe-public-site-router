@@ -29,8 +29,8 @@ On a host that belongs to an enabled Public Site:
 - a missing page (any `PageDoesNotExistError` above) on a site with `not_found_route` → that published
   Web Page (`<prefix>/<not_found_route>`, in the site's own design), still answered with status 404;
   its own address is a 404 too and it is left out of the sitemap. Without one, Frappe's Not Found page
-- technical pages (`404`, `error`, `message`, `website_script.js`) pass through on
-  every site host; account/portal routes (`login`, `me`, `orders`, …), webshop pages (`cart`,
+- technical pages (`404`, `error`, `message`, `website_script.js`, and Builder's colour-token stylesheet
+  `builder_assets/tokens.css`, which every Builder Page links) pass through on every site host; account/portal routes (`login`, `me`, `orders`, …), webshop pages (`cart`,
   `all-products`, …) and published Website Item / Item Group pages pass through only on a site
   with a `webshop_store`
 - on a site with a `blog_category`: `/` → that category's listing (`blog/<category>`, instead of the
@@ -132,7 +132,8 @@ Values are validated on save and re-validated before they reach a snippet; strin
 ## App Hosts (`app_routing.py` pure, `app_hosts.py` Frappe)
 
 The site's apps on their own host names with one sign-in, e.g. OMG's ERP (desk and login on
-`erp.obsessedmediagroup.ca`) serving `crm.` → `/crm`, `hr.` → `/hr`, `lms.`, `insights.`, `builder.`.
+`erp.obsessedmediagroup.ca`) serving `crm.` → `/crm`, `hr.` → `/hrms` (Frappe HR's own app; its desk workspace is
+not an app route), `lms.`, `insights.`, `builder.`.
 
 - **Model**: `host` (unique, a plain DNS name, normalised like Public Site domains), `app_route` (one lowercase segment,
   not one Frappe serves itself: `api`, `assets`, `files`, `desk`, `login`, … `app_routing.RESERVED_ROUTES`), `login_host`

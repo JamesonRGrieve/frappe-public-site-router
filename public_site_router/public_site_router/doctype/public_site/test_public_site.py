@@ -121,7 +121,7 @@ class TestPublicSiteRouting(FrappeTestCase):
 
 	def test_technical_routes_pass_through(self):
 		on_host("zephyrex.test")
-		for route in ("404", "message", "website_script.js"):
+		for route in ("404", "message", "website_script.js", "builder_assets/tokens.css"):
 			self.assertEqual(resolve_path(route), route)
 
 	def test_sitemap_and_robots_are_the_sites_own(self):

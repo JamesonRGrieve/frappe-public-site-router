@@ -19,6 +19,7 @@
   "domains",
   "branding_section",
   "favicon",
+  "standalone_pages",
   "analytics_section",
   "view_tracking",
   "visitor_ids",
@@ -108,6 +109,13 @@
    "label": "Favicon"
   },
   {
+   "default": "0",
+   "description": "This site's Web Pages bring all their own CSS and JavaScript: leave Frappe's website stylesheets and scripts (the Frappe, ERPNext, webshop and blog bundles, website_script.js, icon sprites), its standard footer and its page wrapper out of them, so they load only what they need. Login, webshop and Not Found pages keep Frappe's.",
+   "fieldname": "standalone_pages",
+   "fieldtype": "Check",
+   "label": "Standalone Pages"
+  },
+  {
    "fieldname": "analytics_section",
    "fieldtype": "Section Break",
    "label": "Analytics"
@@ -151,7 +159,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-16 12:00:00.000000",
+ "modified": "2026-10-18 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Public Site Router",
  "name": "Public Site",

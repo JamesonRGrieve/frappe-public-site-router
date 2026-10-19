@@ -23,8 +23,10 @@ give each browser an anonymous visitor ID (off by default; never under Do Not Tr
 can link a visitor's earlier pages to their enquiry.
 
 Sites bring their own header, so their pages are rendered without Frappe's standard navbar (whose links
-to the ERP's shop, cart and login would otherwise sit in every page's HTML). A missing page on a site's
-host is a real 404.
+to the ERP's shop, cart and login would otherwise sit in every page's HTML). A site whose pages bring all
+their own CSS and JavaScript can turn on **Standalone Pages**: its Web Pages then load none of Frappe's
+render-blocking website bundles (Frappe, ERPNext, webshop, blog). A missing page on a site's host is a
+real 404.
 
 ## Install
 

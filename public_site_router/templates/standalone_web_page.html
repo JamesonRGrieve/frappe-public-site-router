@@ -1,0 +1,6 @@
+{#- SPDX-License-Identifier: AGPL-3.0-or-later -#}
+{#- Frappe's Web Page template for standalone pages (site_chrome): the page's content without the <main> and
+    breadcrumbs Frappe wraps it in, since the site's own content brings its landmarks. -#}
+{%- extends "frappe/website/doctype/web_page/templates/web_page.html" -%}
+{%- block breadcrumbs -%}{%- endblock -%}
+{%- block page_container -%}{{ self.page_content() }}{%- endblock -%}

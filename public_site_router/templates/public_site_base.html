@@ -1,4 +1,16 @@
 {#- SPDX-License-Identifier: AGPL-3.0-or-later -#}
-{#- Frappe's base template without its standard navbar: Public Site pages bring their own header (site_chrome). -#}
+{#- Frappe's base template without its standard navbar: Public Site pages bring their own header (site_chrome).
+    A standalone page (site_chrome) also leaves out Frappe's website stylesheet, its standard footer and its
+    scripts: the head keeps only head_html (canonical link, favicon, analytics), and frappe.csrf_token still lands
+    on the window.frappe object base.html creates. -#}
 {%- extends "frappe/templates/base.html" -%}
 {%- block navbar -%}{%- endblock -%}
+{%- block head -%}
+	{%- if standalone_page -%}{{ head_html or "" }}{%- else -%}{{ super() }}{%- endif -%}
+{%- endblock -%}
+{%- block footer -%}
+	{%- if not standalone_page -%}{{ super() }}{%- endif -%}
+{%- endblock -%}
+{%- block base_scripts -%}
+	{%- if not standalone_page -%}{{ super() }}{%- endif -%}
+{%- endblock -%}

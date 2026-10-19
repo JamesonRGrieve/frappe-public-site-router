@@ -10,7 +10,7 @@ public websites, each isolated to its own host names. No Frappe fork: it uses Fr
   unique; by convention the primary domain with its dots as hyphens, e.g. `zephyrex-ca`), analytics
   (`view_tracking`, `visitor_ids`, `ga4_measurement_id`, `matomo_url`, `matomo_site_id`), `home_route` (under the prefix, default `home`), `webshop_store` (name of a
   frappe-webshop fork `Webshop Store`, optional), `blog_category` (name of a blog-app `Blog Category`,
-  optional, one site per category), `domains` (child **Public Site Domain**, host
+  optional, one site per category), `standalone_pages` (see **Page chrome**), `domains` (child **Public Site Domain**, host
   names normalised to lowercase, no port; unique across sites).
 
 ## Routing (`router.py`)
@@ -71,6 +71,15 @@ renders pages (their Not Found page included) on `templates/public_site_base.htm
 (hidden by the site's CSS) and hand crawlers the ERP's own links (`/all-products`, `/cart`, `/login`),
 which are 404s on a site host. A page that set its own `base_template_path` keeps it; hosts outside a
 Public Site keep Frappe's chrome.
+
+**Standalone Pages** (`standalone_pages`, default off): for sites whose pages bring all their own CSS and
+JS. Their Web Pages (`chrome.is_standalone`, pure) render on `templates/standalone_web_page.html`
+(Frappe's Web Page template without its `<main>` wrapper and breadcrumbs: the site's content brings its
+own landmarks), and the base template leaves out Frappe's website stylesheet, `web_include_css/js/icons`
+(the ERPNext, webshop and blog bundles, icon sprites), `frappe-web.bundle.js` with `frappe.boot`, and the
+standard footer. The head keeps `head_html` (canonical, favicon, analytics) and `frappe.csrf_token` still
+lands on the `window.frappe` object base.html creates. Login, webshop, blog and Not Found pages keep
+Frappe's assets: their styling comes from those bundles.
 
 ## Analytics (`analytics.py` pure, `site_analytics.py` Frappe)
 

@@ -1,15 +1,22 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Frappe side of per-host SEO (pure logic in ``seo``).
 
-On a Public Site's hosts, ``/sitemap.xml`` and ``/robots.txt`` are that site's own (``router`` maps them
-to the ``www/public_site_*`` pages), and every page gets a canonical link, ``og:url`` and ``og:site_name``
-naming the site's canonical host, with absolute URLs Frappe built on the ERP's host moved onto it."""
+On a Public Site's hosts, ``/sitemap.xml``, ``/robots.txt``, ``/llms.txt`` and ``/BingSiteAuth.xml`` are
+that site's own (``router`` maps them to the ``www/public_site_*`` pages), and every page gets a canonical
+link, ``og:url`` and ``og:site_name`` naming the site's canonical host, with absolute URLs Frappe built on
+the ERP's host moved onto it."""
 
 import frappe
 from frappe.utils import get_url
 
 from public_site_router import seo
-from public_site_router.router import get_request_site, normalize_host, page_site, site_home
+from public_site_router.router import (
+	get_request_site,
+	normalize_host,
+	not_found_endpoint,
+	page_site,
+	site_home,
+)
 
 ROUTED_DOCTYPES = ("Web Page", "Builder Page", "Web Form")
 IMAGE_TAGS = ("image", "og:image", "twitter:image")
@@ -29,11 +36,14 @@ def published(doctype, filters):
 
 
 def site_routes(site):
-	"""``(endpoint, modified)`` for everything ``site`` publishes: its pages and forms, its blog
-	category's posts (and the listing at ``/``), and its store's Website Items."""
+	"""``(endpoint, modified)`` for everything ``site`` publishes: its pages and forms (not its Not Found
+	page), its blog category's posts (and the listing at ``/``), and its store's Website Items."""
 	routes = []
+	not_found = not_found_endpoint(site)
 	for doctype in ROUTED_DOCTYPES:
-		routes += published(doctype, {"route": ["like", f"{site.route_prefix}/%"]})
+		routes += [
+			r for r in published(doctype, {"route": ["like", f"{site.route_prefix}/%"]}) if r[0] != not_found
+		]
 	if site.get("blog_category"):
 		posts = published("Blog Post", {"blog_category": site.blog_category})
 		routes += posts
@@ -58,7 +68,24 @@ def sitemap_xml():
 
 
 def robots_txt():
-	return seo.robots_txt(canonical_host(require_site()))
+	site = require_site()
+	return seo.robots_txt(canonical_host(site), signal=seo.content_signal(site.get("content_signal")) or "")
+
+
+def llms_txt():
+	"""The site's /llms.txt (llmstxt.org): its own text, or a 404 when it has none."""
+	text = (require_site().get("llms_txt") or "").strip()
+	if not text:
+		raise frappe.PageDoesNotExistError
+	return text + "\n"
+
+
+def bing_site_auth_xml():
+	"""The site's /BingSiteAuth.xml (Bing Webmaster Tools ownership), or a 404 when it has no code."""
+	code = (require_site().get("bing_site_auth") or "").strip()
+	if not seo.valid_bing_code(code):
+		raise frappe.PageDoesNotExistError
+	return seo.bing_site_auth_xml(code)
 
 
 def update_website_context(context):

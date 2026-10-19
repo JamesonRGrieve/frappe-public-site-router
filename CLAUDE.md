@@ -10,7 +10,9 @@ public websites, each isolated to its own host names. No Frappe fork: it uses Fr
   unique; by convention the primary domain with its dots as hyphens, e.g. `zephyrex-ca`), analytics
   (`view_tracking`, `visitor_ids`, `ga4_measurement_id`, `matomo_url`, `matomo_site_id`), `home_route` (under the prefix, default `home`), `webshop_store` (name of a
   frappe-webshop fork `Webshop Store`, optional), `blog_category` (name of a blog-app `Blog Category`,
-  optional, one site per category), `standalone_pages` (see **Page chrome**), `domains` (child **Public Site Domain**, host
+  optional, one site per category), `standalone_pages` (see **Page chrome**), `not_found_route` and
+  `privacy_route` (routes under the prefix; see **Routing** and **Analytics**), `content_signal`,
+  `llms_txt` and `bing_site_auth` (see **SEO**), `domains` (child **Public Site Domain**, host
   names normalised to lowercase, no port; unique across sites).
 
 ## Routing (`router.py`)
@@ -20,8 +22,12 @@ On a host that belongs to an enabled Public Site:
 - `/<path>` → `<prefix>/<path>` when a published Web Page / Web Form / Builder Page has that route
 - `/<any site prefix>/...` (its own or another's) → `PageDoesNotExistError` (one URL per page; no
   cross-site access)
-- `/sitemap.xml` and `/robots.txt` → the site's own (`public_site_sitemap.xml` /
-  `public_site_robots.txt` in `www/`, built by `site_seo`); see **SEO** below
+- `/sitemap.xml`, `/robots.txt`, `/llms.txt` and `/BingSiteAuth.xml` → the site's own
+  (`public_site_sitemap.xml` / `_robots.txt` / `_llms.txt` / `_bing.xml` in `www/`, built by
+  `site_seo`); see **SEO** below
+- a missing page (any `PageDoesNotExistError` above) on a site with `not_found_route` → that published
+  Web Page (`<prefix>/<not_found_route>`, in the site's own design), still answered with status 404;
+  its own address is a 404 too and it is left out of the sitemap. Without one, Frappe's Not Found page
 - technical pages (`404`, `error`, `message`, `website_script.js`) pass through on
   every site host; account/portal routes (`login`, `me`, `orders`, …), webshop pages (`cart`,
   `all-products`, …) and published Website Item / Item Group pages pass through only on a site
@@ -53,13 +59,17 @@ The host → site map is cached (`public_site_router_site_map`) and cleared on P
   clean URLs; the home page is `/`), its blog category's published posts (and the listing at `/`), and
   its store's published Website Items. Dynamic routes are left out. `lastmod` is the document's
   `modified` day.
-- `/robots.txt`: disallows the desk, API and account pages and names the site's sitemap.
+- `/robots.txt`: disallows the desk, API and account pages and names the site's sitemap. With
+  `content_signal` (validated `search|ai-input|ai-train = yes|no`, contentsignals.org) it adds a
+  `Content-Signal:` line to the `User-agent: *` group, after a comment explaining the signals.
+- `/llms.txt` (`llms_txt`, Markdown, llmstxt.org) and `/BingSiteAuth.xml` (`bing_site_auth`, Bing
+  Webmaster Tools' ownership code) are served only when set; otherwise they are 404s.
 - `update_website_context` hook: appends `<link rel="canonical">` to `head_html`, sets `og:url` and
   `og:site_name`, and moves absolute image URLs Frappe built on the ERP's own host (`get_url()`) onto
   the canonical host. Nothing on technical pages, 404s or hosts outside a Public Site.
 - `favicon` (Public Site, square PNG): the same hook sets `context.favicon` (base.html's tab icon) and adds
   an `apple-touch-icon` link, both on the canonical host. Empty keeps the Website Settings favicon.
-- Both `www/public_site_*` pages are `no_cache` (one endpoint serves every site) and 404 off a site host.
+- All `www/public_site_*` pages are `no_cache` (one endpoint serves every site) and 404 off a site host.
 - Per-page titles, descriptions, `meta_image` (Open Graph card) and JSON-LD belong to the page content
   (Web Page fields and its HTML), not this app.
 
@@ -95,7 +105,13 @@ Per Public Site, any combination of providers, each added to every page of that 
     visitors never get one; no cookie) and sends it; `log_view` stores it in `Web Page View.visitor_id`
     only on such a site. A lead form reads the same key so a CRM app (e.g. frappe-crm-heat-tracking)
     can link the visitor's pages to the lead.
-- **Google Analytics 4** (`ga4_measurement_id`, validated `G-…`): the Google tag.
+- **Google Analytics 4** (`ga4_measurement_id`, validated `G-…`): the Google tag **behind a consent
+  banner**. Consent Mode v2 defaults every signal to denied, and `gtag.js` is fetched only after the
+  visitor accepts, so nothing reaches Google before that. The choice is kept in
+  `localStorage["psr_consent"]`; Do Not Track / Global Privacy Control count as a refusal (no banner);
+  any element with `data-psr-consent-reset` (e.g. on the privacy page) clears it. The banner (bottom,
+  `.psr-consent`, restylable) links the site's `privacy_route` when set. Values are embedded with
+  `analytics.js_string` (JSON with `<` escaped), so no field can close the script.
 - **Matomo** (`matomo_url` https + `matomo_site_id` numeric): the standard tracker.
 
 Values are validated on save and re-validated before they reach a snippet; strings are embedded with

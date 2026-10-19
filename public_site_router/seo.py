@@ -9,6 +9,7 @@ A site's canonical host is its first domain that is not a ``www.`` alias. Every 
 and Frappe's per-endpoint page cache stays correct for both.
 """
 
+import re
 from dataclasses import dataclass
 from datetime import date, datetime
 from html import escape
@@ -33,6 +34,14 @@ ROBOTS_DISALLOW = (
 	"/invoices",
 	"/addresses",
 )
+# contentsignals.org: how crawlers may use a site's content once fetched.
+CONTENT_SIGNALS = ("search", "ai-input", "ai-train")
+CONTENT_SIGNAL_PREAMBLE = (
+	"# Content signals (https://contentsignals.org): search = building a search index and showing links\n"
+	"# and short excerpts; ai-input = using content as input to AI answers; ai-train = training or\n"
+	"# fine-tuning AI models.\n"
+)
+BING_CODE = re.compile(r"^[A-Za-z0-9]{8,64}$")
 
 
 def primary_domain(domains: list[str]) -> str:
@@ -102,9 +111,39 @@ def sitemap_xml(entries: list[SitemapEntry]) -> str:
 	return f'<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="{SITEMAP_NAMESPACE}">{urls}\n</urlset>\n'
 
 
-def robots_txt(host: str, disallow: tuple[str, ...] = ROBOTS_DISALLOW) -> str:
+def content_signal(value: str | None) -> str | None:
+	"""``value`` as a normalised Content-Signal line value (``search=yes, ai-input=yes, ai-train=no``), "" for
+	none, or None when it is not one: each part a known signal set to yes or no, each signal at most once."""
+	parts = [p.strip().lower() for p in (value or "").split(",") if p.strip()]
+	seen = {}
+	for part in parts:
+		name, _, answer = (s.strip() for s in part.partition("="))
+		if name not in CONTENT_SIGNALS or answer not in ("yes", "no") or name in seen:
+			return None
+		seen[name] = answer
+	return ", ".join(f"{name}={answer}" for name, answer in seen.items())
+
+
+def robots_txt(host: str, disallow: tuple[str, ...] = ROBOTS_DISALLOW, signal: str = "") -> str:
+	"""The site's robots.txt; with ``signal`` (a valid Content-Signal value), the contentsignals.org line that
+	tells crawlers how the content may be used (search, AI answers, AI training)."""
 	rules = "".join(f"Disallow: {path}\n" for path in disallow)
-	return f"User-agent: *\n{rules}\nSitemap: {page_url(host, SITEMAP_PATH)}\n"
+	preamble, signal_line = "", ""
+	if signal:
+		preamble = CONTENT_SIGNAL_PREAMBLE
+		signal_line = f"Content-Signal: {signal}\n"
+	return f"{preamble}User-agent: *\n{signal_line}{rules}\nSitemap: {page_url(host, SITEMAP_PATH)}\n"
+
+
+def valid_bing_code(code: str | None) -> bool:
+	return bool(BING_CODE.match(code or ""))
+
+
+def bing_site_auth_xml(code: str) -> str:
+	"""Bing Webmaster Tools' ownership file (``/BingSiteAuth.xml``) for verification ``code``."""
+	if not valid_bing_code(code):
+		raise ValueError(f"not a Bing verification code: {code!r}")
+	return f'<?xml version="1.0"?>\n<users>\n\t<user>{code}</user>\n</users>\n'
 
 
 def canonical_link(url: str) -> str:

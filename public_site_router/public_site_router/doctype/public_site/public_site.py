@@ -6,10 +6,11 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.website.utils import clear_website_cache
 
-from public_site_router import analytics
+from public_site_router import analytics, seo
 from public_site_router.router import clear_site_map, normalize_host
 
 PREFIX_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+ROUTE_PATTERN = re.compile(r"^[a-z0-9][a-z0-9/_-]*$")
 
 
 class PublicSite(Document):
@@ -20,7 +21,17 @@ class PublicSite(Document):
 		self.validate_webshop_store()
 		self.validate_blog_category()
 		self.validate_analytics()
+		self.validate_crawler_files()
 		self.home_route = self.home_route.strip("/")
+		for field in ("not_found_route", "privacy_route"):
+			route = (self.get(field) or "").strip().strip("/")
+			if route and not ROUTE_PATTERN.match(route):
+				frappe.throw(
+					_("{0} must be a route of lowercase letters, digits, dashes and slashes.").format(
+						self.meta.get_label(field)
+					)
+				)
+			self.set(field, route)
 
 	def on_update(self):
 		clear_site_map()
@@ -81,6 +92,19 @@ class PublicSite(Document):
 		if not analytics.valid_matomo_site_id(self.matomo_site_id):
 			frappe.throw(_("Matomo needs both its URL and this site's numeric Site ID."))
 		self.matomo_url = base
+
+	def validate_crawler_files(self):
+		signal = seo.content_signal(self.content_signal)
+		if signal is None:
+			frappe.throw(
+				_(
+					"Content Signal must be signals set to yes or no, e.g. search=yes, ai-input=yes, ai-train=no."
+				)
+			)
+		self.content_signal = signal
+		self.bing_site_auth = (self.bing_site_auth or "").strip()
+		if self.bing_site_auth and not seo.valid_bing_code(self.bing_site_auth):
+			frappe.throw(_("Bing Site Auth must be the code from BingSiteAuth.xml (letters and digits)."))
 
 	def validate_blog_category(self):
 		if not self.blog_category:

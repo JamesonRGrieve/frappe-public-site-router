@@ -20,6 +20,14 @@
   "branding_section",
   "favicon",
   "standalone_pages",
+  "pages_section",
+  "not_found_route",
+  "column_break_pages",
+  "privacy_route",
+  "crawlers_section",
+  "content_signal",
+  "bing_site_auth",
+  "llms_txt",
   "analytics_section",
   "view_tracking",
   "visitor_ids",
@@ -116,6 +124,50 @@
    "label": "Standalone Pages"
   },
   {
+   "fieldname": "pages_section",
+   "fieldtype": "Section Break",
+   "label": "Special Pages"
+  },
+  {
+   "description": "Route (under the prefix) of a published Web Page shown, with status 404, for every missing page on this site, so it carries the site's own header and menu. Its own address is a 404 too and it is left out of the sitemap. Empty: Frappe's plain Not Found page.",
+   "fieldname": "not_found_route",
+   "fieldtype": "Data",
+   "label": "Not Found Page Route"
+  },
+  {
+   "fieldname": "column_break_pages",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Route (under the prefix) of the site's privacy page; the Google Analytics consent banner links to it.",
+   "fieldname": "privacy_route",
+   "fieldtype": "Data",
+   "label": "Privacy Page Route"
+  },
+  {
+   "fieldname": "crawlers_section",
+   "fieldtype": "Section Break",
+   "label": "Crawlers"
+  },
+  {
+   "description": "robots.txt Content-Signal (contentsignals.org): how crawlers may use this site's content, e.g. search=yes, ai-input=yes, ai-train=no. Empty: no signal.",
+   "fieldname": "content_signal",
+   "fieldtype": "Data",
+   "label": "Content Signal"
+  },
+  {
+   "description": "Bing Webmaster Tools ownership code: served as /BingSiteAuth.xml. Empty: no file (404).",
+   "fieldname": "bing_site_auth",
+   "fieldtype": "Data",
+   "label": "Bing Site Auth"
+  },
+  {
+   "description": "Served as /llms.txt (llmstxt.org, Markdown): a short guide to the site for AI assistants. Empty: no file (404).",
+   "fieldname": "llms_txt",
+   "fieldtype": "Long Text",
+   "label": "llms.txt"
+  },
+  {
    "fieldname": "analytics_section",
    "fieldtype": "Section Break",
    "label": "Analytics"
@@ -159,7 +211,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-18 12:00:00.000000",
+ "modified": "2026-10-19 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Public Site Router",
  "name": "Public Site",

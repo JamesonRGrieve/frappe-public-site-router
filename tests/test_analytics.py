@@ -23,14 +23,47 @@ class TestGa4:
 	def test_invalid_ids(self, value):
 		assert not analytics.valid_ga4_id(value)
 
-	def test_snippet_is_the_google_tag(self):
+	def test_snippet_is_the_google_tag_behind_consent(self):
+		snippet = analytics.ga4_snippet("G-B30D03ZZWZ")
+		assert "window.dataLayer=window.dataLayer||[]" in snippet
+		assert 'ID="G-B30D03ZZWZ"' in snippet
+		assert "https://www.googletagmanager.com/gtag/js?id='+ID" in snippet
+		assert "gtag('config',ID)" in snippet
+
+	def test_google_script_is_not_fetched_until_consent(self):
+		snippet = analytics.ga4_snippet("G-B30D03ZZWZ")
+		# No static tag: the script element is created only inside load(), after consent.
+		assert "<script async src=" not in snippet
+		load = snippet.index("function load()")
+		assert snippet.index("s.src='https://www.googletagmanager.com") > load
+
+	def test_consent_mode_starts_denied(self):
+		snippet = analytics.ga4_snippet("G-B30D03ZZWZ")
+		default = snippet.index("gtag('consent','default'")
+		for signal in ("ad_storage", "ad_user_data", "ad_personalization", "analytics_storage"):
+			assert f"{signal}:'denied'" in snippet[default : default + 160]
+		assert "gtag('consent','update',{analytics_storage:'granted'})" in snippet
+
+	def test_do_not_track_and_gpc_count_as_a_refusal(self):
 		snippet = analytics.ga4_snippet("G-B30D03ZZWZ")
 		assert (
-			'<script async src="https://www.googletagmanager.com/gtag/js?id=G-B30D03ZZWZ"></script>'
-			in snippet
+			"if(c==='denied'||navigator.globalPrivacyControl||navigator.doNotTrack==='1')return;" in snippet
 		)
-		assert "gtag('config',\"G-B30D03ZZWZ\")" in snippet
-		assert "window.dataLayer=window.dataLayer||[]" in snippet
+
+	def test_banner_links_the_privacy_page_when_given(self):
+		assert 'P="/privacy"' in analytics.ga4_snippet("G-B30D03ZZWZ", "/privacy")
+		assert 'P=""' in analytics.ga4_snippet("G-B30D03ZZWZ")
+
+	def test_privacy_url_cannot_close_the_script(self):
+		snippet = analytics.ga4_snippet("G-B30D03ZZWZ", '/x"</script><img src=x>')
+		# Only the snippet's own closing tag remains; the value is a quoted JS string with < escaped.
+		assert snippet.count("</script>") == 1 and snippet.endswith("</script>")
+		assert 'P="/x\\"\\u003c/script>\\u003cimg src=x>"' in snippet
+
+	def test_choice_is_stored_and_resettable(self):
+		snippet = analytics.ga4_snippet("G-B30D03ZZWZ")
+		assert f'K="{analytics.CONSENT_STORAGE_KEY}"' in snippet
+		assert "[data-psr-consent-reset]" in snippet
 
 	def test_snippet_refuses_an_invalid_id(self):
 		with pytest.raises(ValueError):

@@ -25,6 +25,28 @@ UTM_FIELDS = ("source", "medium", "campaign", "content")
 # UUID without dashes. Other apps (a lead form) read it from the same key.
 VISITOR_STORAGE_KEY = "psr_vid"
 VISITOR_ID = re.compile(r"^[0-9a-f]{32}$")
+# A visitor's Google Analytics choice ("granted" / "denied") in localStorage under this key.
+CONSENT_STORAGE_KEY = "psr_consent"
+CONSENT_TEXT = (
+	"With your OK, we use Google Analytics cookies to see which pages are useful. Nothing is used for ads."
+)
+# The banner sits at the bottom, small enough never to cover the page; sites restyle .psr-consent if they want.
+CONSENT_CSS = (
+	".psr-consent{position:fixed;left:50%;bottom:1rem;transform:translateX(-50%);z-index:2147483000;"
+	"box-sizing:border-box;width:min(40rem,calc(100% - 2rem));display:flex;flex-wrap:wrap;align-items:center;"
+	"gap:.75rem 1rem;padding:.9rem 1rem;background:#fff;color:#1a1a1a;border:1px solid rgba(0,0,0,.15);"
+	"border-radius:.75rem;box-shadow:0 8px 30px rgba(0,0,0,.18);font:400 15px/1.45 system-ui,sans-serif}"
+	".psr-consent p{flex:1 1 16rem;margin:0}.psr-consent a{color:inherit;text-decoration:underline}"
+	".psr-consent__actions{display:flex;gap:.5rem}.psr-consent button{min-height:44px;padding:.5rem 1rem;"
+	"font:600 15px/1 system-ui,sans-serif;border-radius:.5rem;cursor:pointer;border:1px solid #1a1a1a;"
+	"background:#fff;color:#1a1a1a}.psr-consent button[data-choice=granted]{background:#1a1a1a;color:#fff}"
+	".psr-consent button:focus-visible,.psr-consent a:focus-visible{outline:3px solid #1a5fd0;outline-offset:2px}"
+)
+
+
+def js_string(value: str) -> str:
+	"""``value`` as a JavaScript string literal that is also safe inside a <script> element (no ``</script>``)."""
+	return json.dumps(value).replace("<", "\\u003c")
 
 
 def valid_ga4_id(value: str) -> bool:
@@ -51,13 +73,40 @@ def valid_matomo_site_id(value: str) -> bool:
 	return bool(MATOMO_SITE_ID.match(value or ""))
 
 
-def ga4_snippet(measurement_id: str) -> str:
+def ga4_snippet(measurement_id: str, privacy_url: str = "") -> str:
+	"""The Google tag behind a consent banner. Consent Mode v2 starts with everything denied, and Google's
+	script is fetched only once the visitor accepts, so nothing reaches Google before that. The choice is kept
+	in ``localStorage[CONSENT_STORAGE_KEY]``; Do Not Track / Global Privacy Control count as a refusal (no
+	banner). Any element with ``data-psr-consent-reset`` (e.g. on the privacy page) clears the choice."""
 	if not valid_ga4_id(measurement_id):
 		raise ValueError(f"not a GA4 measurement ID: {measurement_id!r}")
+	key, gid = json.dumps(CONSENT_STORAGE_KEY), json.dumps(measurement_id)
 	return (
-		f'<script async src="https://www.googletagmanager.com/gtag/js?id={measurement_id}"></script>'
 		"<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}"
-		f"gtag('js',new Date());gtag('config',{json.dumps(measurement_id)});</script>"
+		"gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',"
+		"analytics_storage:'denied'});"
+		f"(function(){{var K={key},ID={gid},P={js_string(privacy_url)},T={js_string(CONSENT_TEXT)};"
+		"function store(v){try{localStorage.setItem(K,v)}catch(e){}}"
+		"function load(){gtag('consent','update',{analytics_storage:'granted'});var s=document.createElement('script');"
+		"s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id='+ID;document.head.appendChild(s);"
+		"gtag('js',new Date());gtag('config',ID);}"
+		"document.addEventListener('click',function(e){var r=e.target.closest&&e.target.closest('[data-psr-consent-reset]');"
+		"if(r){e.preventDefault();try{localStorage.removeItem(K)}catch(x){}location.reload();}});"
+		"var c=null;try{c=localStorage.getItem(K)}catch(e){}"
+		"if(c==='granted'){load();return;}"
+		"if(c==='denied'||navigator.globalPrivacyControl||navigator.doNotTrack==='1')return;"
+		f"function banner(){{var st=document.createElement('style');st.textContent={js_string(CONSENT_CSS)};"
+		"document.head.appendChild(st);var b=document.createElement('div');b.className='psr-consent';"
+		"b.setAttribute('role','region');b.setAttribute('aria-label','Cookie consent');"
+		"var p=document.createElement('p');p.textContent=T+' ';"
+		"if(P){var a=document.createElement('a');a.href=P;a.textContent='Privacy';p.appendChild(a);}"
+		"var w=document.createElement('div');w.className='psr-consent__actions';"
+		"function btn(t,v){var x=document.createElement('button');x.type='button';x.textContent=t;"
+		"x.dataset.choice=v;x.addEventListener('click',function(){store(v);b.remove();if(v==='granted')load();});"
+		"w.appendChild(x);}"
+		"btn('Decline','denied');btn('Accept','granted');b.appendChild(p);b.appendChild(w);document.body.appendChild(b);}"
+		"if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',banner);else banner();"
+		"})();</script>"
 	)
 
 
@@ -113,6 +162,7 @@ def head_snippets(
 	matomo_site_id: str,
 	log_endpoint: str,
 	visitor_ids: bool = False,
+	privacy_url: str = "",
 ) -> str:
 	"""Every configured provider's snippet for one site. A half-configured or invalid provider adds
 	nothing (Public Site validation rejects those values on save)."""
@@ -120,7 +170,7 @@ def head_snippets(
 	if view_tracking:
 		snippets.append(view_tracker_snippet(log_endpoint, visitor_ids))
 	if valid_ga4_id(ga4_measurement_id):
-		snippets.append(ga4_snippet(ga4_measurement_id))
+		snippets.append(ga4_snippet(ga4_measurement_id, privacy_url))
 	if matomo_base(matomo_url) and valid_matomo_site_id(matomo_site_id):
 		snippets.append(matomo_snippet(matomo_url, matomo_site_id))
 	return "".join(snippets)

@@ -36,6 +36,12 @@ def ensure_custom_fields():
 	create_custom_fields(WEB_PAGE_VIEW_FIELDS, update=True)
 
 
+def privacy_url(site):
+	"""The site's privacy page as a path on its hosts ("" when it has none), for the consent banner's link."""
+	route = (site.get("privacy_route") or "").strip("/")
+	return f"/{route}" if route else ""
+
+
 def update_website_context(context):
 	"""update_website_context hook: the request's site's analytics snippets on its pages."""
 	page = page_site(context)
@@ -49,6 +55,7 @@ def update_website_context(context):
 		matomo_site_id=site.get("matomo_site_id") or "",
 		log_endpoint=LOG_ENDPOINT,
 		visitor_ids=bool(site.get("visitor_ids")),
+		privacy_url=privacy_url(site),
 	)
 	if snippets:
 		context.head_html = (context.get("head_html") or "") + snippets

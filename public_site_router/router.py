@@ -9,7 +9,9 @@ Each ``Public Site`` owns a set of host names and a route prefix. On one of its 
   is sent to ``/<path>`` instead;
 * any path whose first segment is a site prefix (its own or another's) is a 404, so a
   site's pages are reachable only through its own clean URLs;
-* ``/sitemap.xml`` and ``/robots.txt`` are the site's own (``site_seo``), naming its canonical host;
+* ``/sitemap.xml``, ``/robots.txt``, ``/llms.txt`` and ``/BingSiteAuth.xml`` are the site's own
+  (``site_seo``), naming its canonical host;
+* a missing page is a real 404, rendered as the site's own Not Found page when it has one;
 * a few technical pages (404/error/message, website_script.js) pass through
   everywhere; account, portal and webshop routes (login, cart, listing, product and item-group
   pages) pass through only on a site with a Webshop Store;
@@ -39,7 +41,12 @@ ROUTED_DOCTYPES = ("Web Page", "Builder Page")
 # Website routes every Public Site host serves besides its own pages.
 TECHNICAL_ROUTES = frozenset({"404", "error", "message", "website_script.js"})
 # A site host's sitemap and robots.txt are the site's own (www/public_site_*, built in site_seo).
-SEO_ENDPOINTS = {"sitemap.xml": "public_site_sitemap.xml", "robots.txt": "public_site_robots.txt"}
+SEO_ENDPOINTS = {
+	"sitemap.xml": "public_site_sitemap.xml",
+	"robots.txt": "public_site_robots.txt",
+	"llms.txt": "public_site_llms.txt",
+	"BingSiteAuth.xml": "public_site_bing.xml",
+}
 # Website routes served only on a site with a Webshop Store: customer account + portal pages
 # and the webshop's own pages (first path segment). Item/Item Group pages are matched by route.
 STORE_ACCOUNT_ROUTES = frozenset(
@@ -113,7 +120,10 @@ def page_site(context):
 	None off a site host, on technical pages and on 404s."""
 	site = get_request_site()
 	endpoint = (getattr(frappe.local, "path", None) or context.get("path") or "").strip("/")
-	if not site or endpoint in TECHNICAL_ROUTES or context.get("http_status_code") == 404:
+	not_found = context.get("http_status_code") == HTTP_NOT_FOUND or frappe.local.flags.get(
+		"public_site_not_found"
+	)
+	if not site or endpoint in TECHNICAL_ROUTES or not_found:
 		return None
 	return site, endpoint
 
@@ -178,6 +188,12 @@ def is_shared_route(site, path):
 	)
 
 
+def not_found_endpoint(site):
+	"""The endpoint of ``site``'s own Not Found page (its ``not_found_route`` under its prefix), or None."""
+	route = (site.get("not_found_route") or "").strip("/")
+	return f"{site.route_prefix}/{route}" if route else None
+
+
 def site_endpoint(site, path, prefixes):
 	"""The route ``path`` maps to on ``site``'s hosts (None = pass through unchanged)."""
 	if not path:
@@ -187,6 +203,8 @@ def site_endpoint(site, path, prefixes):
 	if path.split("/", 1)[0] in prefixes:
 		raise frappe.PageDoesNotExistError
 	candidate = f"{site.route_prefix}/{path}"
+	if candidate == not_found_endpoint(site):
+		raise frappe.PageDoesNotExistError  # the Not Found page is never a page of its own
 	if page_exists(candidate):
 		return candidate
 	if is_site_blog_post(site, path) or is_shared_route(site, path):
@@ -196,7 +214,9 @@ def site_endpoint(site, path, prefixes):
 
 def resolve_path(path):
 	"""website_path_resolver hook. A disabled site's hosts serve nothing (404), so a domain can go
-	live in DNS before its site launches without exposing the ERP's own website on it."""
+	live in DNS before its site launches without exposing the ERP's own website on it. A missing page on a
+	site with its own Not Found page (``not_found_route``) is that page, in the site's own design."""
+	site = None
 	try:
 		site = get_request_site()
 		if site:
@@ -205,8 +225,12 @@ def resolve_path(path):
 			raise frappe.PageDoesNotExistError
 	except frappe.PageDoesNotExistError:
 		# Frappe renders a resolver's PageDoesNotExistError as its Not Found page with the request's
-		# default status (200); not_found_status gives that response its real 404.
+		# default status (200); not_found_status gives that response, and the site's own Not Found page,
+		# their real 404.
 		frappe.local.flags.public_site_not_found = True
+		own = not_found_endpoint(site) if site else None
+		if own and page_exists(own):
+			return resolve_with_other_resolvers(own)
 		raise
 	return resolve_with_other_resolvers(path)
 

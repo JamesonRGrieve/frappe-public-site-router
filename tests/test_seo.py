@@ -127,6 +127,44 @@ class TestRobots:
 			assert f"Disallow: {path}" in lines
 		assert "Disallow: /" not in lines
 
+	def test_no_content_signal_by_default(self):
+		assert "Content-Signal" not in seo.robots_txt("zephyrex.ca")
+
+	def test_content_signal_sits_in_the_all_agents_group(self):
+		text = seo.robots_txt("zephyrex.ca", signal="search=yes, ai-input=yes, ai-train=no")
+		lines = text.splitlines()
+		group = lines.index("User-agent: *")
+		assert lines[group + 1] == "Content-Signal: search=yes, ai-input=yes, ai-train=no"
+		assert all(line.startswith("#") for line in lines[:group])
+		assert text.endswith("\nSitemap: https://zephyrex.ca/sitemap.xml\n")
+
+
+class TestContentSignal:
+	def test_normalises(self):
+		assert seo.content_signal(" Search=YES ,ai-train = no ") == "search=yes, ai-train=no"
+
+	def test_empty_is_no_signal(self):
+		assert seo.content_signal("") == "" and seo.content_signal(None) == ""
+
+	@pytest.mark.parametrize(
+		"value", ["search=maybe", "ai=yes", "search", "search=yes, search=no", "search=yes\nDisallow: /"]
+	)
+	def test_rejects_anything_else(self, value):
+		assert seo.content_signal(value) is None
+
+
+class TestBing:
+	def test_site_auth_file(self):
+		assert seo.bing_site_auth_xml("ABCDEF0123456789ABCDEF0123456789") == (
+			'<?xml version="1.0"?>\n<users>\n\t<user>ABCDEF0123456789ABCDEF0123456789</user>\n</users>\n'
+		)
+
+	@pytest.mark.parametrize("code", ["", None, "short", "<x>injected</x>", "A" * 65])
+	def test_rejects_anything_but_a_code(self, code):
+		assert not seo.valid_bing_code(code)
+		with pytest.raises(ValueError):
+			seo.bing_site_auth_xml(code)
+
 
 class TestCanonicalLink:
 	def test_link(self):

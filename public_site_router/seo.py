@@ -42,6 +42,20 @@ CONTENT_SIGNAL_PREAMBLE = (
 	"# fine-tuning AI models.\n"
 )
 BING_CODE = re.compile(r"^[A-Za-z0-9]{8,64}$")
+# Response headers every page of a site with Security Headers carries (OWASP Secure Headers). HSTS is one year
+# without includeSubDomains or preload (operator, 2026-10-19), so it can be lowered and browsers forget it in a year.
+SECURITY_HEADERS = {
+	"Strict-Transport-Security": "max-age=31536000",
+	"X-Content-Type-Options": "nosniff",
+	"X-Frame-Options": "SAMEORIGIN",
+	"Referrer-Policy": "strict-origin-when-cross-origin",
+}
+
+
+def missing_security_headers(present: set[str]) -> dict[str, str]:
+	"""The security headers a response lacks (``present``: its header names, any case); one it already sets wins."""
+	have = {name.lower() for name in present}
+	return {name: value for name, value in SECURITY_HEADERS.items() if name.lower() not in have}
 
 
 def primary_domain(domains: list[str]) -> str:

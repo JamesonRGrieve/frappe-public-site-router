@@ -33,6 +33,8 @@ from urllib.parse import urlsplit, urlunsplit
 import frappe
 from frappe.website.path_resolver import resolve_path as frappe_resolve_path
 
+from public_site_router import seo
+
 SITE_MAP_CACHE_KEY = "public_site_router_site_map"
 HTTP_OK = 200
 HTTP_NOT_FOUND = 404
@@ -240,6 +242,14 @@ def not_found_status(response, request):
 	engines drop it instead of indexing a soft 404."""
 	if frappe.local.flags.get("public_site_not_found") and response.status_code == HTTP_OK:
 		response.status_code = HTTP_NOT_FOUND
+
+
+def security_headers(response, request):
+	"""after_request hook: on a site with Security Headers, every response on its hosts carries HSTS, nosniff, a
+	same-origin frame policy and a referrer policy, unless it already sets them."""
+	site = get_request_site()
+	if site and site.get("security_headers"):
+		response.headers.update(seo.missing_security_headers(set(response.headers.keys())))
 
 
 def clean_location(site, location):

@@ -11,7 +11,7 @@ public websites, each isolated to its own host names. No Frappe fork: it uses Fr
   (`view_tracking`, `visitor_ids`, `ga4_measurement_id`, `matomo_url`, `matomo_site_id`), `home_route` (under the prefix, default `home`), `webshop_store` (name of a
   frappe-webshop fork `Webshop Store`, optional), `blog_category` (name of a blog-app `Blog Category`,
   optional, one site per category), `standalone_pages` (see **Page chrome**), `not_found_route` and
-  `privacy_route` (routes under the prefix; see **Routing** and **Analytics**), `content_signal`,
+  `privacy_route` (routes under the prefix; see **Routing** and **Analytics**), `security_headers`, `content_signal`,
   `llms_txt` and `bing_site_auth` (see **SEO**), `domains` (child **Public Site Domain**, host
   names normalised to lowercase, no port; unique across sites).
 
@@ -62,6 +62,11 @@ The host → site map is cached (`public_site_router_site_map`) and cleared on P
 - `/robots.txt`: disallows the desk, API and account pages and names the site's sitemap. With
   `content_signal` (validated `search|ai-input|ai-train = yes|no`, contentsignals.org) it adds a
   `Content-Signal:` line to the `User-agent: *` group, after a comment explaining the signals.
+- **Security Headers** (`security_headers`, default off): an `after_request` hook gives every response on
+  the site's hosts `Strict-Transport-Security: max-age=31536000` (no `includeSubDomains`, no `preload`),
+  `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN` and `Referrer-Policy:
+  strict-origin-when-cross-origin` (`seo.SECURITY_HEADERS`), unless the response already sets one. Set at
+  the app, not the edge: HAProxy's header rewrites apply to every service behind the frontend.
 - `/llms.txt` (`llms_txt`, Markdown, llmstxt.org) and `/BingSiteAuth.xml` (`bing_site_auth`, Bing
   Webmaster Tools' ownership code) are served only when set; otherwise they are 404s.
 - `update_website_context` hook: appends `<link rel="canonical">` to `head_html`, sets `og:url` and

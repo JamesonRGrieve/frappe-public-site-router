@@ -153,6 +153,24 @@ class TestContentSignal:
 		assert seo.content_signal(value) is None
 
 
+class TestSecurityHeaders:
+	def test_all_four_when_none_are_set(self):
+		assert seo.missing_security_headers(set()) == {
+			"Strict-Transport-Security": "max-age=31536000",
+			"X-Content-Type-Options": "nosniff",
+			"X-Frame-Options": "SAMEORIGIN",
+			"Referrer-Policy": "strict-origin-when-cross-origin",
+		}
+
+	def test_hsts_has_no_subdomains_or_preload(self):
+		hsts = seo.SECURITY_HEADERS["Strict-Transport-Security"]
+		assert "includeSubDomains" not in hsts and "preload" not in hsts
+
+	def test_a_header_the_response_sets_wins_in_any_case(self):
+		missing = seo.missing_security_headers({"x-frame-options", "Content-Type"})
+		assert "X-Frame-Options" not in missing and len(missing) == 3
+
+
 class TestBing:
 	def test_site_auth_file(self):
 		assert seo.bing_site_auth_xml("ABCDEF0123456789ABCDEF0123456789") == (

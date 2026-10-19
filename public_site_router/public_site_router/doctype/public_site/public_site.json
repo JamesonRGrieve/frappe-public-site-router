@@ -20,6 +20,7 @@
   "branding_section",
   "favicon",
   "standalone_pages",
+  "security_headers",
   "pages_section",
   "not_found_route",
   "column_break_pages",
@@ -124,6 +125,13 @@
    "label": "Standalone Pages"
   },
   {
+   "default": "0",
+   "description": "Every response on this site's hosts carries Strict-Transport-Security (one year, no subdomains, no preload), X-Content-Type-Options: nosniff, X-Frame-Options: SAMEORIGIN and Referrer-Policy: strict-origin-when-cross-origin, unless it already sets them. Browsers remember HSTS for a year: only turn it on for a site served over HTTPS for good.",
+   "fieldname": "security_headers",
+   "fieldtype": "Check",
+   "label": "Security Headers"
+  },
+  {
    "fieldname": "pages_section",
    "fieldtype": "Section Break",
    "label": "Special Pages"
@@ -211,7 +219,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-19 12:00:00.000000",
+ "modified": "2026-10-19 13:00:00.000000",
  "modified_by": "Administrator",
  "module": "Public Site Router",
  "name": "Public Site",

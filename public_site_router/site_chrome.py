@@ -30,6 +30,8 @@ def update_website_context(context):
 	if chrome.is_standalone(site.get("standalone_pages"), context.get("doctype"), context.get("template")):
 		context.standalone_page = True
 		context.template = STANDALONE_WEB_PAGE
+		if context.get("page_builder_html"):
+			context.page_builder_html = chrome.wrap_main(context.page_builder_html)
 		context.web_include_css = []
 		context.web_include_js = []
 		context.web_include_icons = []

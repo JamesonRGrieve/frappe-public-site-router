@@ -1,14 +1,7 @@
 {#- SPDX-License-Identifier: AGPL-3.0-or-later -#}
 {#- Frappe's Web Page template for standalone pages (site_chrome): the page's content without the <main> and
-    breadcrumbs Frappe wraps it in, since a site's own content usually brings its landmarks. Content that has no
-    <main> of its own (e.g. a page of several section blocks, which Page Builder renders one by one, so no block can
-    wrap the others) gets one, so the page keeps its main landmark. -#}
+    breadcrumbs Frappe wraps it in. The site's content brings its landmarks: its own <main>, or blocks marked
+    data-main-content, which site_chrome wraps in one (chrome.wrap_main). -#}
 {%- extends "frappe/website/doctype/web_page/templates/web_page.html" -%}
 {%- block breadcrumbs -%}{%- endblock -%}
-{%- block page_container -%}
-	{%- if "<main" in ((page_builder_html or "") ~ (main_section or "")) -%}
-		{{ self.page_content() }}
-	{%- else -%}
-		<main id="main">{{ self.page_content() }}</main>
-	{%- endif -%}
-{%- endblock -%}
+{%- block page_container -%}{{ self.page_content() }}{%- endblock -%}

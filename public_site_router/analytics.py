@@ -25,10 +25,14 @@ UTM_FIELDS = ("source", "medium", "campaign", "content")
 # UUID without dashes. Other apps (a lead form) read it from the same key.
 VISITOR_STORAGE_KEY = "psr_vid"
 VISITOR_ID = re.compile(r"^[0-9a-f]{32}$")
-# A visitor's Google Analytics choice ("granted" / "denied") in localStorage under this key.
+# A visitor's analytics cookie choice ("granted" / "denied") in localStorage under this key. It covers Google Analytics
+# (loaded only once granted) and Matomo's cookies (Matomo itself counts without cookies until then).
 CONSENT_STORAGE_KEY = "psr_consent"
+# Fired on document when the visitor answers the banner (detail: "granted" / "denied"), so Matomo can start using
+# cookies on the same page.
+CONSENT_EVENT = "psr-consent"
 CONSENT_TEXT = (
-	"With your OK, we use Google Analytics cookies to see which pages are useful. Nothing is used for ads."
+	"With your OK, we use analytics cookies to see which pages are useful. Nothing is used for ads."
 )
 # The banner sits at the bottom, small enough never to cover the page; sites restyle .psr-consent if they want.
 CONSENT_CSS = (
@@ -80,7 +84,7 @@ def ga4_snippet(measurement_id: str, privacy_url: str = "") -> str:
 	banner). Any element with ``data-psr-consent-reset`` (e.g. on the privacy page) clears the choice."""
 	if not valid_ga4_id(measurement_id):
 		raise ValueError(f"not a GA4 measurement ID: {measurement_id!r}")
-	key, gid = json.dumps(CONSENT_STORAGE_KEY), json.dumps(measurement_id)
+	key, gid, event = json.dumps(CONSENT_STORAGE_KEY), json.dumps(measurement_id), json.dumps(CONSENT_EVENT)
 	return (
 		"<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}"
 		"gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',"
@@ -102,7 +106,8 @@ def ga4_snippet(measurement_id: str, privacy_url: str = "") -> str:
 		"if(P){var a=document.createElement('a');a.href=P;a.textContent='Privacy';p.appendChild(a);}"
 		"var w=document.createElement('div');w.className='psr-consent__actions';"
 		"function btn(t,v){var x=document.createElement('button');x.type='button';x.textContent=t;"
-		"x.dataset.choice=v;x.addEventListener('click',function(){store(v);b.remove();if(v==='granted')load();});"
+		"x.dataset.choice=v;x.addEventListener('click',function(){store(v);b.remove();if(v==='granted')load();"
+		f"document.dispatchEvent(new CustomEvent({event},{{detail:v}}));}});"
 		"w.appendChild(x);}"
 		"btn('Decline','denied');btn('Accept','granted');b.appendChild(p);b.appendChild(w);document.body.appendChild(b);}"
 		"if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',banner);else banner();"
@@ -111,12 +116,20 @@ def ga4_snippet(measurement_id: str, privacy_url: str = "") -> str:
 
 
 def matomo_snippet(url: str, site_id: str) -> str:
+	"""The Matomo tracker, cookieless until the visitor accepts the consent banner: ``requireCookieConsent`` counts
+	visits without cookies (and clears any it set before), and the stored or just-given ``granted`` choice turns them
+	on. Do Not Track / Global Privacy Control visitors are not tracked at all, as with the Frappe view tracker."""
 	base = matomo_base(url)
 	if base is None or not valid_matomo_site_id(site_id):
 		raise ValueError(f"not a Matomo base URL and site ID: {url!r}, {site_id!r}")
+	key, event = json.dumps(CONSENT_STORAGE_KEY), json.dumps(CONSENT_EVENT)
 	return (
-		"<script>var _paq=window._paq=window._paq||[];_paq.push(['trackPageView']);_paq.push(['enableLinkTracking']);"
-		f"(function(){{var u={json.dumps(base)};_paq.push(['setTrackerUrl',u+'matomo.php']);"
+		"<script>(function(){if(navigator.doNotTrack==='1'||navigator.globalPrivacyControl)return;"
+		"var _paq=window._paq=window._paq||[];_paq.push(['requireCookieConsent']);"
+		f"var c=null;try{{c=localStorage.getItem({key})}}catch(e){{}}if(c==='granted')_paq.push(['setCookieConsentGiven']);"
+		f"document.addEventListener({event},function(e){{if(e.detail==='granted')_paq.push(['setCookieConsentGiven']);}});"
+		"_paq.push(['trackPageView']);_paq.push(['enableLinkTracking']);"
+		f"var u={json.dumps(base)};_paq.push(['setTrackerUrl',u+'matomo.php']);"
 		f"_paq.push(['setSiteId',{json.dumps(site_id)}]);var d=document,g=d.createElement('script'),"
 		"s=d.getElementsByTagName('script')[0];g.async=true;g.src=u+'matomo.js';s.parentNode.insertBefore(g,s);})();"
 		"</script>"

@@ -101,6 +101,24 @@ class TestMatomo:
 		assert "_paq.push(['setSiteId',\"7\"])" in snippet
 		assert "u+'matomo.js'" in snippet and "u+'matomo.php'" in snippet
 
+	def test_cookieless_until_consent(self):
+		snippet = analytics.matomo_snippet("https://matomo.zephyrex.ca", "7")
+		require = snippet.index("_paq.push(['requireCookieConsent'])")
+		assert require < snippet.index("_paq.push(['trackPageView'])")
+		assert f"localStorage.getItem({json.dumps(analytics.CONSENT_STORAGE_KEY)})" in snippet
+		assert "if(c==='granted')_paq.push(['setCookieConsentGiven'])" in snippet
+		assert f"document.addEventListener({json.dumps(analytics.CONSENT_EVENT)}" in snippet
+
+	def test_dnt_and_gpc_are_not_tracked(self):
+		snippet = analytics.matomo_snippet("https://matomo.zephyrex.ca", "7")
+		guard = snippet.index("if(navigator.doNotTrack==='1'||navigator.globalPrivacyControl)return;")
+		assert guard < snippet.index("_paq.push(['trackPageView'])")
+
+	def test_banner_answer_tells_matomo(self):
+		banner = analytics.ga4_snippet("G-ABC123")
+		assert f"new CustomEvent({json.dumps(analytics.CONSENT_EVENT)},{{detail:v}})" in banner
+		assert "Google Analytics" not in analytics.CONSENT_TEXT  # the choice covers Matomo's cookies too
+
 	def test_snippet_refuses_bad_config(self):
 		with pytest.raises(ValueError):
 			analytics.matomo_snippet("http://m.ca", "1")

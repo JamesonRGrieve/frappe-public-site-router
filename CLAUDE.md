@@ -132,7 +132,12 @@ Per Public Site, any combination of providers, each added to every page of that 
   any element with `data-psr-consent-reset` (e.g. on the privacy page) clears it. The banner (bottom,
   `.psr-consent`, restylable) links the site's `privacy_route` when set. Values are embedded with
   `analytics.js_string` (JSON with `<` escaped), so no field can close the script.
-- **Matomo** (`matomo_url` https + `matomo_site_id` numeric): the standard tracker.
+- **Matomo** (`matomo_url` https + `matomo_site_id` numeric): the standard tracker, **cookieless until the
+  visitor accepts the banner**. `requireCookieConsent` counts every visit without cookies (and clears `_pk_*` cookies
+  set before); a stored `granted` choice, or the banner's Accept on the same page (the `psr-consent` event the banner
+  fires), turns them on. Do Not Track / Global Privacy Control visitors aren't tracked at all, as with the Frappe
+  view tracker. The banner's text covers both ("analytics cookies"); without GA4 there is no banner and Matomo stays
+  cookieless.
 
 Values are validated on save and re-validated before they reach a snippet; strings are embedded with
 `json.dumps`. Saving a Public Site clears the website page cache so a change shows at once.

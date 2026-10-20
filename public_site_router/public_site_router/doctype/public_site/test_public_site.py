@@ -584,6 +584,15 @@ class TestPublicSiteSeo(FrappeTestCase):
 		self.assertNotIn("canonical", context.head_html)
 		self.assertNotIn("canonical", context._head_html)
 
+	def test_not_found_builder_page_prints_no_template_as_its_canonical(self):
+		on_host("zephyrex.test")
+		context = self.context(
+			"zx/missing", http_status_code=404, _head_html="", canonical_url="{{ public_site_canonical_url }}"
+		)
+		site_seo.update_website_context(context)
+		self.assertEqual(context.canonical_url, "")
+		self.assertNotIn("public_site_canonical_url", context)
+
 	def test_site_builder_pages_get_the_canonical_template(self):
 		page = frappe._dict(route="zx/about", canonical_url=None)
 		site_seo.set_builder_canonical(page)

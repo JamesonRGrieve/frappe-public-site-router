@@ -91,6 +91,11 @@ def bing_site_auth_xml():
 
 def update_website_context(context):
 	"""update_website_context hook: canonical link, Open Graph URL tags and the site's favicon on its pages."""
+	# A Builder Page's canonical_url arrives here as its raw field. On a normal page Builder renders it after this hook;
+	# on a page served as a 404 (the site's Not Found page) it doesn't, and would print the template itself. Blank, it
+	# prints no canonical, which is right for a 404.
+	if context.get("canonical_url") == seo.BUILDER_CANONICAL_TEMPLATE:
+		context.canonical_url = ""
 	page = page_site(context)
 	if not page:
 		return

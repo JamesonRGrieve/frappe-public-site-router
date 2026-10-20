@@ -87,18 +87,30 @@ def page_url(host: str, path: str) -> str:
 	return f"{SCHEME}://{host}/{quote(path.strip('/'), safe=URL_PATH_SAFE)}"
 
 
-# The context key holding a site page's canonical URL, and the Builder Page canonical_url naming it. Builder prints its
-# own canonical link from the page's canonical_url, rendered as Jinja with the page context after the
-# update_website_context hooks have run (and from the prefixed route when it is empty), so a site's Builder Pages
-# carry this template and the router's hook fills it in.
-CANONICAL_CONTEXT_KEY = "public_site_canonical_url"
-BUILDER_CANONICAL_TEMPLATE = "{{ " + CANONICAL_CONTEXT_KEY + " }}"
+# The context keys holding a page's canonical host and path, and the Builder Page canonical_url naming them. Builder
+# prints its own canonical link from the page's canonical_url, rendered as Jinja with the page context after the
+# update_website_context hooks have run (and from the prefixed route when it is empty), so a site's Builder Pages carry
+# this template and the router's hook fills it in. canonical_url is a URL field Frappe checks on every save (a scheme
+# and a host), and the validate hook that sets it runs before that check, so the template must itself parse as a URL.
+CANONICAL_HOST_KEY = "public_site_canonical_host"
+CANONICAL_PATH_KEY = "public_site_canonical_path"
+BUILDER_CANONICAL_TEMPLATE = f"{SCHEME}://{{{{ {CANONICAL_HOST_KEY} }}}}{{{{ {CANONICAL_PATH_KEY} }}}}"
+# 8ac7fe9's template, which isn't a valid URL (it made every save of a site Builder Page fail); replaced wherever found.
+LEGACY_BUILDER_CANONICAL_TEMPLATES = frozenset({"{{ public_site_canonical_url }}"})
+BUILDER_CANONICAL_TEMPLATES = LEGACY_BUILDER_CANONICAL_TEMPLATES | {BUILDER_CANONICAL_TEMPLATE}
+
+
+def url_host_and_path(url: str) -> tuple[str, str]:
+	"""``(host, path)`` of an absolute URL, the path starting with ``/``: the template's two context values."""
+	parts = urlsplit(url)
+	return parts.netloc, parts.path or "/"
 
 
 def builder_canonical_url(route: str | None, prefixes: Iterable[str], current: str | None) -> str | None:
-	"""The canonical_url a Builder Page under a site prefix should carry (the template), when it has none of its own;
-	None to leave the page as it is."""
-	if (current or "").strip():
+	"""The canonical_url a Builder Page under a site prefix should carry (the template), when it has none of its own or
+	still has a legacy template; None to leave the page as it is."""
+	current = (current or "").strip()
+	if current and current not in LEGACY_BUILDER_CANONICAL_TEMPLATES:
 		return None
 	first = (route or "").strip("/").split("/", 1)[0]
 	return BUILDER_CANONICAL_TEMPLATE if first and first in set(prefixes) else None

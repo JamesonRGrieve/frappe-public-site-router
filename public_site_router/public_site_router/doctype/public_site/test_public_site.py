@@ -12,7 +12,7 @@ from frappe.tests.utils import FrappeTestCase
 from werkzeug.test import EnvironBuilder
 from werkzeug.wrappers import Request, Response
 
-from public_site_router import site_analytics, site_chrome, site_seo
+from public_site_router import seo, site_analytics, site_chrome, site_seo
 from public_site_router.router import (
 	clean_redirect,
 	clear_site_map,
@@ -580,23 +580,37 @@ class TestPublicSiteSeo(FrappeTestCase):
 		on_host("www.zephyrex.test")
 		context = self.context("zx/about", _head_html="<meta name=b>")
 		site_seo.update_website_context(context)
-		self.assertEqual(context.public_site_canonical_url, "https://zephyrex.test/about")
+		self.assertEqual(context.public_site_canonical_host, "zephyrex.test")
+		self.assertEqual(context.public_site_canonical_path, "/about")
+		rendered = frappe.render_template(seo.BUILDER_CANONICAL_TEMPLATE, context)
+		self.assertEqual(rendered, "https://zephyrex.test/about")
 		self.assertNotIn("canonical", context.head_html)
 		self.assertNotIn("canonical", context._head_html)
 
 	def test_not_found_builder_page_prints_no_template_as_its_canonical(self):
 		on_host("zephyrex.test")
-		context = self.context(
-			"zx/missing", http_status_code=404, _head_html="", canonical_url="{{ public_site_canonical_url }}"
-		)
+		for template in seo.BUILDER_CANONICAL_TEMPLATES:
+			context = self.context("zx/missing", http_status_code=404, _head_html="", canonical_url=template)
+			site_seo.update_website_context(context)
+			self.assertEqual(context.canonical_url, "")
+
+	def test_builder_page_off_a_site_host_names_its_own_address(self):
+		on_host("erp.example.test")
+		context = self.context("zx/about", _head_html="")
 		site_seo.update_website_context(context)
-		self.assertEqual(context.canonical_url, "")
-		self.assertNotIn("public_site_canonical_url", context)
+		self.assertEqual(context.public_site_canonical_host, "erp.example.test")
+
+	def test_canonical_template_passes_frappes_url_field_check(self):
+		# canonical_url is a Data field with options URL: Frappe validates it on every save, after validate hooks.
+		self.assertTrue(frappe.utils.validate_url(seo.BUILDER_CANONICAL_TEMPLATE))
 
 	def test_site_builder_pages_get_the_canonical_template(self):
 		page = frappe._dict(route="zx/about", canonical_url=None)
 		site_seo.set_builder_canonical(page)
-		self.assertEqual(page.canonical_url, "{{ public_site_canonical_url }}")
+		self.assertEqual(page.canonical_url, seo.BUILDER_CANONICAL_TEMPLATE)
+		legacy = frappe._dict(route="zx/about", canonical_url="{{ public_site_canonical_url }}")
+		site_seo.set_builder_canonical(legacy)
+		self.assertEqual(legacy.canonical_url, seo.BUILDER_CANONICAL_TEMPLATE)
 		own = frappe._dict(route="zx/about", canonical_url="https://example.test/x")
 		site_seo.set_builder_canonical(own)
 		self.assertEqual(own.canonical_url, "https://example.test/x")

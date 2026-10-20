@@ -11,6 +11,7 @@ from frappe.utils import get_url
 
 from public_site_router import chrome, seo
 from public_site_router.router import (
+	get_request_host,
 	get_request_site,
 	get_site_map,
 	normalize_host,
@@ -94,16 +95,19 @@ def update_website_context(context):
 	# A Builder Page's canonical_url arrives here as its raw field. On a normal page Builder renders it after this hook;
 	# on a page served as a 404 (the site's Not Found page) it doesn't, and would print the template itself. Blank, it
 	# prints no canonical, which is right for a 404.
-	if context.get("canonical_url") == seo.BUILDER_CANONICAL_TEMPLATE:
+	if context.get("canonical_url") in seo.BUILDER_CANONICAL_TEMPLATES:
 		context.canonical_url = ""
 	page = page_site(context)
 	if not page:
+		if chrome.BUILDER_HEAD_HTML in context and frappe.local.request:
+			# Off a site host (e.g. a preview on the ERP's own host) the template names the page's own address.
+			set_canonical_parts(context, get_request_host(), frappe.local.request.path or "/")
 		return
 	site, endpoint = page
 	host = canonical_host(site)
 	erp_hosts = {normalize_host(get_url())}
 	url = seo.page_url(host, seo.clean_path(endpoint, site.route_prefix, site_home(site)))
-	context[seo.CANONICAL_CONTEXT_KEY] = url
+	set_canonical_parts(context, *seo.url_host_and_path(url))
 	# A Builder Page prints its own canonical link from canonical_url (BUILDER_CANONICAL_TEMPLATE, set on save), so a
 	# second one here would give the page two.
 	head = "" if chrome.BUILDER_HEAD_HTML in context else seo.canonical_link(url)
@@ -122,6 +126,12 @@ def update_website_context(context):
 			tags[key] = seo.rehost(tags[key], erp_hosts, host)
 
 
+def set_canonical_parts(context, host, path):
+	"""The values ``seo.BUILDER_CANONICAL_TEMPLATE`` renders from."""
+	context[seo.CANONICAL_HOST_KEY] = host
+	context[seo.CANONICAL_PATH_KEY] = path
+
+
 def set_builder_canonical(doc, method=None):
 	"""Builder Page validate hook: a page under a site prefix with no canonical_url of its own gets the template that
 	names its clean URL on the site's canonical host (``seo.BUILDER_CANONICAL_TEMPLATE``)."""
@@ -131,7 +141,8 @@ def set_builder_canonical(doc, method=None):
 
 
 def backfill_builder_canonicals():
-	"""after_migrate hook: the template on every existing site Builder Page without a canonical_url (idempotent)."""
+	"""after_migrate hook: the template on every existing site Builder Page without a canonical_url, or with a legacy
+	template (idempotent)."""
 	if not frappe.db.table_exists("Builder Page"):
 		return
 	prefixes = get_site_map()["prefixes"]

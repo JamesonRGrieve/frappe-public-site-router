@@ -4,6 +4,7 @@ sitemap, robots.txt, the canonical link and moving ERP-host URLs onto a site's h
 
 import xml.etree.ElementTree as ET
 from datetime import date, datetime
+from urllib.parse import urlsplit
 
 import pytest
 
@@ -60,10 +61,35 @@ class TestBuilderCanonicalUrl:
 	PREFIXES = ("omg-ca", "zx")
 
 	def test_site_page_without_its_own_gets_the_template(self):
-		assert (
-			seo.builder_canonical_url("omg-ca/seo", self.PREFIXES, None) == "{{ public_site_canonical_url }}"
+		assert seo.builder_canonical_url("omg-ca/seo", self.PREFIXES, None) == (
+			"https://{{ public_site_canonical_host }}{{ public_site_canonical_path }}"
 		)
 		assert seo.builder_canonical_url("/zx/home", self.PREFIXES, "  ") == seo.BUILDER_CANONICAL_TEMPLATE
+
+	def test_legacy_template_is_replaced(self):
+		legacy = "{{ public_site_canonical_url }}"
+		assert (
+			seo.builder_canonical_url("omg-ca/seo", self.PREFIXES, legacy) == seo.BUILDER_CANONICAL_TEMPLATE
+		)
+
+	def test_template_passes_frappes_url_check(self):
+		# frappe.utils.validate_url (version-16): a scheme and a host (or path), or a leading "/". canonical_url is a URL
+		# field checked on every save, after the validate hook has set it.
+		parts = urlsplit(seo.BUILDER_CANONICAL_TEMPLATE)
+		assert parts.scheme == "https" and parts.netloc
+		for legacy in seo.LEGACY_BUILDER_CANONICAL_TEMPLATES:
+			legacy_parts = urlsplit(legacy)
+			assert not (
+				legacy_parts.scheme and (legacy_parts.netloc or legacy_parts.path)
+			) and not legacy.startswith("/")
+
+	def test_template_renders_the_clean_url(self):
+		host, path = seo.url_host_and_path("https://zephyrex.test/infrastructure/firewalls")
+		rendered = seo.BUILDER_CANONICAL_TEMPLATE.replace("{{ public_site_canonical_host }}", host).replace(
+			"{{ public_site_canonical_path }}", path
+		)
+		assert rendered == "https://zephyrex.test/infrastructure/firewalls"
+		assert seo.url_host_and_path("https://zephyrex.test/") == ("zephyrex.test", "/")
 
 	@pytest.mark.parametrize(
 		("route", "current"),
@@ -79,8 +105,9 @@ class TestBuilderCanonicalUrl:
 	def test_other_pages_are_left_alone(self, route, current):
 		assert seo.builder_canonical_url(route, self.PREFIXES, current) is None
 
-	def test_template_names_the_context_key(self):
-		assert seo.CANONICAL_CONTEXT_KEY in seo.BUILDER_CANONICAL_TEMPLATE
+	def test_template_names_the_context_keys(self):
+		assert seo.CANONICAL_HOST_KEY in seo.BUILDER_CANONICAL_TEMPLATE
+		assert seo.CANONICAL_PATH_KEY in seo.BUILDER_CANONICAL_TEMPLATE
 
 
 class TestDynamicRoutes:

@@ -76,11 +76,14 @@ The host → site map is cached (`public_site_router_site_map`) and cleared on P
   endpoint the router resolved (`flags.public_site_endpoint`), not Frappe's path, which for `/` is the global home page.
 - **Builder Pages' canonical**: Builder prints its own canonical link after the hooks run, from the page's
   `canonical_url` rendered as Jinja with the page context (else its prefixed route, a 404 on the site). So the hook puts
-  the URL in the context (`public_site_canonical_url`) and adds no link of its own on a Builder Page, and every Builder
-  Page under a site prefix with no `canonical_url` of its own carries `{{ public_site_canonical_url }}`: set on
-  validate, and backfilled after migrate. Off a site host it renders empty and Builder prints none. A Builder Page
-  served as a site's Not Found page reaches the hooks with that field raw and Builder never renders it there, so the
-  hook blanks an unrendered template: a 404 prints no canonical.
+  the URL's host and path in the context (`public_site_canonical_host`, `public_site_canonical_path`) and adds no link
+  of its own on a Builder Page. Every Builder Page under a site prefix with no `canonical_url` of its own carries
+  `https://{{ public_site_canonical_host }}{{ public_site_canonical_path }}`: set on validate, and backfilled after
+  migrate (which also replaces 8ac7fe9's `{{ public_site_canonical_url }}`). `canonical_url` is a URL field Frappe checks
+  on every save, after the validate hooks, so the template must itself parse as a URL: the old one made every save of a
+  site Builder Page fail. Off a site host the hook fills in the request's own host and path. A Builder Page served as a
+  site's Not Found page reaches the hooks with that field raw and Builder never renders it there, so the hook blanks an
+  unrendered template: a 404 prints no canonical.
 - `favicon` (Public Site, square PNG): the same hook sets `context.favicon` (base.html's tab icon) and adds
   an `apple-touch-icon` link, both on the canonical host. Empty keeps the Website Settings favicon.
 - All `www/public_site_*` pages are `no_cache` (one endpoint serves every site) and 404 off a site host.

@@ -10,6 +10,7 @@ and Frappe's per-endpoint page cache stays correct for both.
 """
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, datetime
 from html import escape
@@ -84,6 +85,23 @@ def clean_path(endpoint: str, route_prefix: str, home_endpoint: str) -> str:
 
 def page_url(host: str, path: str) -> str:
 	return f"{SCHEME}://{host}/{quote(path.strip('/'), safe=URL_PATH_SAFE)}"
+
+
+# The context key holding a site page's canonical URL, and the Builder Page canonical_url naming it. Builder prints its
+# own canonical link from the page's canonical_url, rendered as Jinja with the page context after the
+# update_website_context hooks have run (and from the prefixed route when it is empty), so a site's Builder Pages
+# carry this template and the router's hook fills it in.
+CANONICAL_CONTEXT_KEY = "public_site_canonical_url"
+BUILDER_CANONICAL_TEMPLATE = "{{ " + CANONICAL_CONTEXT_KEY + " }}"
+
+
+def builder_canonical_url(route: str | None, prefixes: Iterable[str], current: str | None) -> str | None:
+	"""The canonical_url a Builder Page under a site prefix should carry (the template), when it has none of its own;
+	None to leave the page as it is."""
+	if (current or "").strip():
+		return None
+	first = (route or "").strip("/").split("/", 1)[0]
+	return BUILDER_CANONICAL_TEMPLATE if first and first in set(prefixes) else None
 
 
 @dataclass(frozen=True)

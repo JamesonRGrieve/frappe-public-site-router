@@ -243,6 +243,35 @@ class TestAppLinks:
 	def test_other_routes_are_unchanged(self, route):
 		assert app_routing.rewrite_route(route, {"crm": "crm.omg.test"}) == route
 
+	def test_fallback_host_is_the_app_hosts_login_host(self):
+		assert app_routing.fallback_host(APP_HOSTS, "crm.omg.test") == "erp.omg.test"
+		assert app_routing.fallback_host(APP_HOSTS, "crm.zx.test") == "erp.zx.test"
+		assert app_routing.fallback_host(APP_HOSTS, "erp.omg.test") is None
+		assert app_routing.fallback_host(APP_HOSTS, "obsessedmediagroup.test") is None
+
+	@pytest.mark.parametrize(
+		("route", "url"),
+		[
+			("/crm", "https://crm.omg.test/crm"),
+			("/desk/home", "https://erp.omg.test/desk/home"),
+			("/app/blog", "https://erp.omg.test/app/blog"),
+			("/lms", "https://erp.omg.test/lms"),
+		],
+	)
+	def test_on_an_app_host_other_apps_open_on_the_login_host(self, route, url):
+		assert app_routing.rewrite_route(route, {"crm": "crm.omg.test"}, "erp.omg.test") == url
+
+	@pytest.mark.parametrize("route", ["", None, "https://frappe.io/crm", "//crm", "/x\\y"])
+	def test_fallback_leaves_non_relative_routes(self, route):
+		assert app_routing.rewrite_route(route, {"crm": "crm.omg.test"}, "erp.omg.test") == route
+
+	def test_rewrite_apps_with_fallback(self):
+		apps = [{"name": "crm", "route": "/crm"}, {"name": "erpnext", "route": "/desk/home"}]
+		assert app_routing.rewrite_apps(apps, "route", {"crm": "crm.omg.test"}, "erp.omg.test") == [
+			{"name": "crm", "route": "https://crm.omg.test/crm"},
+			{"name": "erpnext", "route": "https://erp.omg.test/desk/home"},
+		]
+
 	def test_rewrite_apps_copies(self):
 		apps = [{"name": "crm", "route": "/crm"}, {"name": "erpnext", "route": "/desk"}, {"name": "x"}]
 		rewritten = app_routing.rewrite_apps(apps, "route", {"crm": "crm.omg.test"})

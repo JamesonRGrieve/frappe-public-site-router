@@ -41,10 +41,21 @@ before_request = ["public_site_router.app_hosts.before_request"]
 
 # Frappe apps' own app menus (e.g. CRM's) read frappe.apps.get_apps; on a login or app host it links each app with
 # an App Host on its host.
-override_whitelisted_methods = {"frappe.apps.get_apps": "public_site_router.app_hosts.get_apps"}
+override_whitelisted_methods = {
+	"frappe.apps.get_apps": "public_site_router.app_hosts.get_apps",
+	# Builder's own app menu (only called where Builder is installed).
+	"builder.api.get_apps": "public_site_router.app_hosts.get_builder_apps",
+}
 
-# Web Page View's public_site field (views stamped with their site).
-after_migrate = ["public_site_router.site_analytics.ensure_custom_fields"]
+# Web Page View's public_site field (views stamped with their site), and the canonical-URL template on site Builder
+# Pages saved before it existed.
+after_migrate = [
+	"public_site_router.site_analytics.ensure_custom_fields",
+	"public_site_router.site_seo.backfill_builder_canonicals",
+]
+
+# A site's Builder Pages name their clean URL as canonical (Builder prints its own canonical link from canonical_url).
+doc_events = {"Builder Page": {"validate": "public_site_router.site_seo.set_builder_canonical"}}
 
 # Answers the frappe-webshop fork's multi-store hook: which Webshop Store serves this request.
 webshop_store_resolver = "public_site_router.router.get_request_store"

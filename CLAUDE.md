@@ -72,7 +72,13 @@ The host → site map is cached (`public_site_router_site_map`) and cleared on P
   Webmaster Tools' ownership code) are served only when set; otherwise they are 404s.
 - `update_website_context` hook: appends `<link rel="canonical">` to `head_html`, sets `og:url` and
   `og:site_name`, and moves absolute image URLs Frappe built on the ERP's own host (`get_url()`) onto
-  the canonical host. Nothing on technical pages, 404s or hosts outside a Public Site.
+  the canonical host. Nothing on technical pages, 404s or hosts outside a Public Site. The page's URL comes from the
+  endpoint the router resolved (`flags.public_site_endpoint`), not Frappe's path, which for `/` is the global home page.
+- **Builder Pages' canonical**: Builder prints its own canonical link after the hooks run, from the page's
+  `canonical_url` rendered as Jinja with the page context (else its prefixed route, a 404 on the site). So the hook puts
+  the URL in the context (`public_site_canonical_url`) and adds no link of its own on a Builder Page, and every Builder
+  Page under a site prefix with no `canonical_url` of its own carries `{{ public_site_canonical_url }}`: set on
+  validate, and backfilled after migrate. Off a site host it renders empty and Builder prints none.
 - `favicon` (Public Site, square PNG): the same hook sets `context.favicon` (base.html's tab icon) and adds
   an `apple-touch-icon` link, both on the canonical host. Empty keeps the Website Settings favicon.
 - All `www/public_site_*` pages are `no_cache` (one endpoint serves every site) and 404 off a site host.
@@ -169,11 +175,12 @@ not an app route), `lms.`, `insights.`, `builder.`.
 - **Desk links**: on a login host or an app host (never elsewhere), the `update_website_context` hook rewrites the
   boot data the desk and website pages render from (`boot.app_data[].app_route`: apps screen and app switcher;
   `boot.apps_data.apps[].route`: website pages' Apps link) to `https://<host>/<route>` for apps with an App Host of that
-  login host, on copies. `override_whitelisted_methods` replaces `frappe.apps.get_apps` (what Frappe apps' own app
-  menus, e.g. CRM's, call) with the same rewrite. `extend_bootinfo` / `boot_session` can't do it: `apps_data` is set
-  after `extend_bootinfo` runs, and `boot_session` output is cached per user, not per host. The desk's apps screen
-  opens absolute routes in a new tab (desktop.js); Builder's own app menu (`builder.api.get_apps`, Redis-cached)
-  keeps relative routes.
+  login host, on copies. On an app host, every other relative route (the desk, apps without an App Host) becomes a URL
+  on the login host: on the app host it would only show a second sign-in. `override_whitelisted_methods` replaces
+  `frappe.apps.get_apps` (what Frappe apps' own app menus, e.g. CRM's, call) and `builder.api.get_apps` (Builder's
+  menu, Redis-cached across hosts, so rewritten after the cache) with the same rewrite. `extend_bootinfo` /
+  `boot_session` can't do it: `apps_data` is set after `extend_bootinfo` runs, and `boot_session` output is cached per
+  user, not per host. The desk's apps screen opens absolute routes in a new tab (desktop.js).
 - **Deploying**: each app host must reach this Frappe site (DNS, TLS, the proxy, and Frappe's site resolution by host:
   a bench domain or `X-Frappe-Site-Name`).
 

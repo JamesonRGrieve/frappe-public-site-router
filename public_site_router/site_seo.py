@@ -12,6 +12,7 @@ from frappe.utils import get_url
 from public_site_router import chrome, seo
 from public_site_router.router import (
 	get_request_site,
+	get_site_map,
 	normalize_host,
 	not_found_endpoint,
 	page_site,
@@ -97,7 +98,10 @@ def update_website_context(context):
 	host = canonical_host(site)
 	erp_hosts = {normalize_host(get_url())}
 	url = seo.page_url(host, seo.clean_path(endpoint, site.route_prefix, site_home(site)))
-	head = seo.canonical_link(url)
+	context[seo.CANONICAL_CONTEXT_KEY] = url
+	# A Builder Page prints its own canonical link from canonical_url (BUILDER_CANONICAL_TEMPLATE, set on save), so a
+	# second one here would give the page two.
+	head = "" if chrome.BUILDER_HEAD_HTML in context else seo.canonical_link(url)
 	if site.get("favicon"):
 		# base.html renders `favicon` as the tab icon; the same image is the home-screen icon.
 		context.favicon = seo.site_asset_url(site.favicon, erp_hosts, host)
@@ -111,3 +115,23 @@ def update_website_context(context):
 	for key in IMAGE_TAGS:
 		if tags.get(key):
 			tags[key] = seo.rehost(tags[key], erp_hosts, host)
+
+
+def set_builder_canonical(doc, method=None):
+	"""Builder Page validate hook: a page under a site prefix with no canonical_url of its own gets the template that
+	names its clean URL on the site's canonical host (``seo.BUILDER_CANONICAL_TEMPLATE``)."""
+	url = seo.builder_canonical_url(doc.route, get_site_map()["prefixes"], doc.get("canonical_url"))
+	if url:
+		doc.canonical_url = url
+
+
+def backfill_builder_canonicals():
+	"""after_migrate hook: the template on every existing site Builder Page without a canonical_url (idempotent)."""
+	if not frappe.db.table_exists("Builder Page"):
+		return
+	prefixes = get_site_map()["prefixes"]
+	for row in frappe.get_all("Builder Page", fields=["name", "route", "canonical_url"]):
+		url = seo.builder_canonical_url(row.route, prefixes, row.canonical_url)
+		if url:
+			frappe.db.set_value("Builder Page", row.name, "canonical_url", url, update_modified=False)
+			frappe.clear_document_cache("Builder Page", row.name)

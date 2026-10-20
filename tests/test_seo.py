@@ -56,6 +56,33 @@ class TestPageUrl:
 		assert seo.page_url("3shub.ca", "posts/a b&c") == "https://3shub.ca/posts/a%20b%26c"
 
 
+class TestBuilderCanonicalUrl:
+	PREFIXES = ("omg-ca", "zx")
+
+	def test_site_page_without_its_own_gets_the_template(self):
+		assert (
+			seo.builder_canonical_url("omg-ca/seo", self.PREFIXES, None) == "{{ public_site_canonical_url }}"
+		)
+		assert seo.builder_canonical_url("/zx/home", self.PREFIXES, "  ") == seo.BUILDER_CANONICAL_TEMPLATE
+
+	@pytest.mark.parametrize(
+		("route", "current"),
+		[
+			("omg-ca/seo", "https://example.com/seo"),  # the page chose its own
+			("omg-ca/seo", seo.BUILDER_CANONICAL_TEMPLATE),  # already set
+			("omg-builder-preview/seo", None),  # not under a site prefix
+			("omg-cax/seo", None),
+			("", None),
+			(None, None),
+		],
+	)
+	def test_other_pages_are_left_alone(self, route, current):
+		assert seo.builder_canonical_url(route, self.PREFIXES, current) is None
+
+	def test_template_names_the_context_key(self):
+		assert seo.CANONICAL_CONTEXT_KEY in seo.BUILDER_CANONICAL_TEMPLATE
+
+
 class TestDynamicRoutes:
 	@pytest.mark.parametrize("route", ["project/<name>", "blog/:name", ":id"])
 	def test_dynamic(self, route):

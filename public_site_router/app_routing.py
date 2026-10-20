@@ -180,19 +180,30 @@ def app_links(app_hosts: Mapping[str, AppHost], request_host: str) -> dict[str, 
 	}
 
 
-def rewrite_route(route: str | None, links: Mapping[str, str]) -> str | None:
+def fallback_host(app_hosts: Mapping[str, AppHost], request_host: str) -> str | None:
+	"""Where an app without an App Host opens from an app host: its login host (the desk, and every other app, live
+	there; the app host would only show a second sign-in). None on a login host or any other host."""
+	app_host = app_hosts.get(request_host)
+	return app_host.login_host if app_host else None
+
+
+def rewrite_route(route: str | None, links: Mapping[str, str], fallback: str | None = None) -> str | None:
 	"""A relative app route (``/crm`` or ``/crm/...``) of an app that has an App Host, as a URL on that host; any other
-	route unchanged."""
+	relative route as a URL on ``fallback`` when one is given; anything else unchanged."""
 	if not route or not is_safe_relative_path(route):
 		return route
 	segment = urlsplit(route).path.strip("/").split("/", 1)[0]
-	host = links.get(segment)
+	host = links.get(segment) or fallback
 	return f"{APP_HOST_SCHEME}://{host}{route}" if host else route
 
 
-def rewrite_apps(apps: Iterable[Mapping], route_key: str, links: Mapping[str, str]) -> list[dict]:
+def rewrite_apps(
+	apps: Iterable[Mapping], route_key: str, links: Mapping[str, str], fallback: str | None = None
+) -> list[dict]:
 	"""Copies of ``apps`` (Frappe's app lists) with each ``route_key`` rewritten by ``rewrite_route``."""
 	return [
-		{**app, route_key: rewrite_route(app.get(route_key), links)} if route_key in app else dict(app)
+		{**app, route_key: rewrite_route(app.get(route_key), links, fallback)}
+		if route_key in app
+		else dict(app)
 		for app in apps
 	]

@@ -202,28 +202,45 @@ def accept(token: str) -> None:
 	redirect(app_routing.safe_next_path(payload.get("next"), app_host.app_route))
 
 
-def request_app_links() -> dict[str, str]:
-	return app_routing.app_links(get_app_hosts(), get_request_host())
+def request_app_links() -> tuple[dict[str, str], str | None]:
+	"""The request's ``(app links, fallback host)``: see ``app_routing.app_links`` and ``app_routing.fallback_host``."""
+	app_hosts, host = get_app_hosts(), get_request_host()
+	return app_routing.app_links(app_hosts, host), app_routing.fallback_host(app_hosts, host)
 
 
 def update_website_context(context) -> None:
 	"""update_website_context hook: on a login or app host, the boot data the desk (``app_data``: apps screen and app
-	switcher) and website pages (``apps_data``) render from links each app with an App Host on that host."""
+	switcher) and website pages (``apps_data``) render from links each app with an App Host on that host, and on an
+	app host every other app on the login host."""
 	boot = context.get("boot")
-	links = request_app_links() if boot else {}
+	links, fallback = request_app_links() if boot else ({}, None)
 	if not links:
 		return
 	boot = frappe._dict(boot)
 	if boot.get("app_data"):
-		boot.app_data = app_routing.rewrite_apps(boot.app_data, "app_route", links)
+		boot.app_data = app_routing.rewrite_apps(boot.app_data, "app_route", links, fallback)
 	apps_data = boot.get("apps_data")
 	if apps_data and apps_data.get("apps"):
-		boot.apps_data = {**apps_data, "apps": app_routing.rewrite_apps(apps_data["apps"], "route", links)}
+		boot.apps_data = {
+			**apps_data,
+			"apps": app_routing.rewrite_apps(apps_data["apps"], "route", links, fallback),
+		}
 	context.boot = boot
 
 
 @frappe.whitelist()
 def get_apps() -> list[dict]:
 	"""Override of ``frappe.apps.get_apps`` (the app menus of Frappe's own app frontends, e.g. CRM's), with each app
-	that has an App Host linked on that host."""
-	return app_routing.rewrite_apps(frappe_get_apps(), "route", request_app_links())
+	that has an App Host linked on that host, and on an app host every other app on the login host."""
+	links, fallback = request_app_links()
+	return app_routing.rewrite_apps(frappe_get_apps(), "route", links, fallback)
+
+
+@frappe.whitelist()
+def get_builder_apps() -> list[dict]:
+	"""Override of ``builder.api.get_apps`` (Builder's own app menu, which lists Desk as ``/app``), rewritten the same
+	way. Builder's result is Redis-cached across hosts, so it is rewritten after the cache, per request."""
+	from builder.api import get_apps as builder_get_apps
+
+	links, fallback = request_app_links()
+	return app_routing.rewrite_apps(builder_get_apps(), "route", links, fallback)

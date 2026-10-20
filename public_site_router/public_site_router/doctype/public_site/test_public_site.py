@@ -34,6 +34,7 @@ def on_host(host):
 	"""Make the current request a real Werkzeug request for ``host`` (as Frappe serves it)."""
 	frappe.local.request = Request(EnvironBuilder(base_url=f"http://{host}/").get_environ()) if host else None
 	frappe.local.flags.pop("public_site_not_found", None)
+	frappe.local.flags.pop("public_site_endpoint", None)
 
 
 def make_site(name, prefix, domains, company=None, webshop_store=None, blog_category=None):
@@ -565,6 +566,34 @@ class TestPublicSiteSeo(FrappeTestCase):
 		context = self.context("zx/home")
 		site_seo.update_website_context(context)
 		self.assertEqual(context.metatags["og:url"], "https://zephyrex.test/")
+
+	def test_home_canonical_follows_the_resolved_endpoint_not_frappes_home_page(self):
+		# For `/` Frappe's own path is its global home page (here: login); the router's resolution is the site's home.
+		on_host("zephyrex.test")
+		resolve_path("")
+		context = self.context("login")
+		site_seo.update_website_context(context)
+		self.assertEqual(context.metatags["og:url"], "https://zephyrex.test/")
+		self.assertIn('href="https://zephyrex.test/"', context.head_html)
+
+	def test_builder_page_gets_its_url_in_context_and_no_second_canonical(self):
+		on_host("www.zephyrex.test")
+		context = self.context("zx/about", _head_html="<meta name=b>")
+		site_seo.update_website_context(context)
+		self.assertEqual(context.public_site_canonical_url, "https://zephyrex.test/about")
+		self.assertNotIn("canonical", context.head_html)
+		self.assertNotIn("canonical", context._head_html)
+
+	def test_site_builder_pages_get_the_canonical_template(self):
+		page = frappe._dict(route="zx/about", canonical_url=None)
+		site_seo.set_builder_canonical(page)
+		self.assertEqual(page.canonical_url, "{{ public_site_canonical_url }}")
+		own = frappe._dict(route="zx/about", canonical_url="https://example.test/x")
+		site_seo.set_builder_canonical(own)
+		self.assertEqual(own.canonical_url, "https://example.test/x")
+		other = frappe._dict(route="landing/x", canonical_url=None)
+		site_seo.set_builder_canonical(other)
+		self.assertIsNone(other.canonical_url)
 
 	def test_images_on_the_erp_host_move_to_the_site_host(self):
 		on_host("zephyrex.test")

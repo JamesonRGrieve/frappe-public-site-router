@@ -119,7 +119,10 @@ def page_site(context):
 	"""``(site, endpoint)`` for a page render on a Public Site's host, for update_website_context hooks;
 	None off a site host, on technical pages and on 404s."""
 	site = get_request_site()
-	endpoint = (getattr(frappe.local, "path", None) or context.get("path") or "").strip("/")
+	# The endpoint this router resolved for the request; Frappe's own path for `/` is its global home page (e.g.
+	# login), not the site's home.
+	resolved = frappe.local.flags.get("public_site_endpoint")
+	endpoint = (resolved or getattr(frappe.local, "path", None) or context.get("path") or "").strip("/")
 	not_found = context.get("http_status_code") == HTTP_NOT_FOUND or frappe.local.flags.get(
 		"public_site_not_found"
 	)
@@ -221,6 +224,7 @@ def resolve_path(path):
 		site = get_request_site()
 		if site:
 			path = site_endpoint(site, path, get_site_map()["prefixes"]) or path
+			frappe.local.flags.public_site_endpoint = path
 		elif get_request_host() in get_site_map().get("closed_hosts", {}):
 			raise frappe.PageDoesNotExistError
 	except frappe.PageDoesNotExistError:

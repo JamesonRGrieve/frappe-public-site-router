@@ -141,7 +141,18 @@ def page_exists(route):
 	for doctype in ROUTED_DOCTYPES:
 		if frappe.db.table_exists(doctype) and frappe.db.exists(doctype, {"route": route, "published": 1}):
 			return True
-	return is_web_form_route(route)
+	return is_web_form_route(route) or is_dynamic_page_route(route)
+
+
+def is_dynamic_page_route(route):
+	"""A page of a published Web Page with a dynamic route (``<prefix>/storyteller/paint/<code>``); Frappe resolves
+	it to that Web Page and passes the parameters to its context."""
+	return any(
+		seo.matches_dynamic_route(page_route, route)
+		for page_route in frappe.get_all(
+			"Web Page", filters={"published": 1, "dynamic_route": 1}, pluck="route"
+		)
+	)
 
 
 def is_web_form_route(route):

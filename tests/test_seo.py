@@ -304,3 +304,33 @@ class TestTouchIcon:
 			seo.touch_icon_link('https://a.ca/f "x".png')
 			== '<link rel="apple-touch-icon" href="https://a.ca/f &quot;x&quot;.png">'
 		)
+
+
+class TestDynamicRouteMatching:
+	@pytest.mark.parametrize(
+		("route", "path"),
+		[
+			("3shub-ca/storyteller/paint/<code>", "3shub-ca/storyteller/paint/T87"),
+			("3shub-ca/storyteller/option/<model>/<code>", "3shub-ca/storyteller/option/Z16A/302"),
+			("3shub-ca/docs/<path:rest>", "3shub-ca/docs/a/b/c"),
+			("3shub-ca/storyteller/paint/:code", "3shub-ca/storyteller/paint/T87/"),
+		],
+	)
+	def test_matches(self, route, path):
+		assert seo.matches_dynamic_route(route, path)
+
+	@pytest.mark.parametrize(
+		("route", "path"),
+		[
+			("3shub-ca/storyteller/paint/<code>", "3shub-ca/storyteller/paint"),
+			("3shub-ca/storyteller/paint/<code>", "3shub-ca/storyteller/paint/T87/extra"),
+			("3shub-ca/storyteller/paint/<code>", "zephyrex-ca/storyteller/paint/T87"),
+			(
+				"3shub-ca/storyteller/paint",
+				"3shub-ca/storyteller/paint",
+			),  # a static route is not a dynamic one
+			("3shub-ca/a.b/<code>", "3shub-ca/aXb/T87"),  # literal parts are matched literally
+		],
+	)
+	def test_does_not_match(self, route, path):
+		assert not seo.matches_dynamic_route(route, path)

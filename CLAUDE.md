@@ -21,11 +21,15 @@ public websites, each isolated to its own host names. No Frappe fork: it uses Fr
 On a host that belongs to an enabled Public Site:
 - `/` → `<prefix>/<home_route>`
 - `/<path>` → `<prefix>/<path>` when a published Web Page / Web Form / Builder Page has that route
+  (or when a published Web Page with `dynamic_route` set has a route pattern that matches it, e.g.
+  `<prefix>/storyteller/paint/<code>`; Frappe passes the parameters to that page)
 - `/<any site prefix>/...` (its own or another's) → `PageDoesNotExistError` (one URL per page; no
   cross-site access)
 - `/sitemap.xml`, `/robots.txt`, `/llms.txt` and `/BingSiteAuth.xml` → the site's own
   (`public_site_sitemap.xml` / `_robots.txt` / `_llms.txt` / `_bing.xml` in `www/`, built by
-  `site_seo`); see **SEO** below
+  `site_seo`); see **SEO** below. The sitemap also lists the pages behind dynamic routes that apps report through the
+  `public_site_sitemap_routes` hook (a function taking the site, returning `(endpoint, modified)` pairs under its
+  prefix)
 - a missing page (any `PageDoesNotExistError` above) on a site with `not_found_route` → that published
   Web Page (`<prefix>/<not_found_route>`, in the site's own design), still answered with status 404;
   its own address is a 404 too and it is left out of the sitemap. Without one, Frappe's Not Found page

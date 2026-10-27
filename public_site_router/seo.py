@@ -74,6 +74,28 @@ def is_dynamic_route(route: str) -> bool:
 	return "<" in route or any(part.startswith(":") for part in route.split("/"))
 
 
+_ROUTE_PARAM = re.compile(
+	r"<(?:(?P<converter>[a-z]+):)?(?P<name>[A-Za-z_][A-Za-z0-9_]*)>|:(?P<colon>[A-Za-z_][A-Za-z0-9_]*)"
+)
+
+
+def dynamic_route_pattern(route: str) -> re.Pattern:
+	"""A compiled matcher for a dynamic route (Frappe's ``<name>``, ``<path:name>`` or ``:name`` parameters): a
+	parameter matches one path segment, a ``path`` parameter the rest of the path."""
+	parts, last = [], 0
+	for match in _ROUTE_PARAM.finditer(route):
+		parts.append(re.escape(route[last : match.start()]))
+		parts.append(".+" if match.group("converter") == "path" else "[^/]+")
+		last = match.end()
+	parts.append(re.escape(route[last:]))
+	return re.compile("^" + "".join(parts) + "$")
+
+
+def matches_dynamic_route(route: str, path: str) -> bool:
+	"""Whether ``path`` is a page of the dynamic route ``route`` (``3shub-ca/storyteller/paint/<code>``)."""
+	return is_dynamic_route(route) and bool(dynamic_route_pattern(route).match(path.strip("/")))
+
+
 def clean_path(endpoint: str, route_prefix: str, home_endpoint: str) -> str:
 	"""The path ``endpoint`` is served at on its site's hosts ("" for the home page)."""
 	endpoint = endpoint.strip("/")

@@ -53,6 +53,14 @@ def site_routes(site):
 	if site.get("webshop_store") and frappe.db.table_exists("Website Item"):
 		if frappe.get_meta("Website Item").has_field("webshop_store"):
 			routes += published("Website Item", {"webshop_store": site.webshop_store})
+	# Pages behind a dynamic-route Web Page, which only the app serving them can list: each
+	# ``public_site_sitemap_routes`` hook takes the site and returns ``(endpoint, modified)`` pairs.
+	for method in frappe.get_hooks("public_site_sitemap_routes"):
+		routes += [
+			(route, modified)
+			for route, modified in frappe.get_attr(method)(site)
+			if route.startswith(f"{site.route_prefix}/")
+		]
 	return routes
 
 

@@ -6,7 +6,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.website.utils import clear_website_cache
 
-from public_site_router import analytics, seo
+from public_site_router import analytics, forms, seo
 from public_site_router.router import clear_site_map, normalize_host
 
 PREFIX_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]*$")
@@ -21,6 +21,7 @@ class PublicSite(Document):
 		self.validate_webshop_store()
 		self.validate_blog_category()
 		self.validate_analytics()
+		self.validate_form_protection()
 		self.validate_crawler_files()
 		self.home_route = self.home_route.strip("/")
 		for field in ("not_found_route", "privacy_route"):
@@ -98,6 +99,11 @@ class PublicSite(Document):
 		if not analytics.valid_matomo_site_id(self.matomo_site_id):
 			frappe.throw(_("Matomo needs both its URL and this site's numeric Site ID."))
 		self.matomo_url = base
+
+	def validate_form_protection(self):
+		self.turnstile_site_key = (self.turnstile_site_key or "").strip()
+		if self.turnstile_site_key and not forms.valid_site_key(self.turnstile_site_key):
+			frappe.throw(_("Turnstile Site Key must be a Cloudflare Turnstile site key (0x…)."))
 
 	def validate_crawler_files(self):
 		signal = seo.content_signal(self.content_signal)

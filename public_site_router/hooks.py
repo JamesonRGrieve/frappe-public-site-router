@@ -31,6 +31,7 @@ after_request = [
 update_website_context = [
 	"public_site_router.site_seo.update_website_context",
 	"public_site_router.site_analytics.update_website_context",
+	"public_site_router.site_forms.update_website_context",
 	"public_site_router.site_chrome.update_website_context",
 	# On a login or app host: the desk's apps screen / app switcher link each app with an App Host on its host.
 	"public_site_router.app_hosts.update_website_context",
@@ -43,6 +44,8 @@ before_request = ["public_site_router.app_hosts.before_request"]
 # an App Host on its host.
 override_whitelisted_methods = {
 	"frappe.apps.get_apps": "public_site_router.app_hosts.get_apps",
+	# Web Form submissions: Turnstile verified on a protected Public Site's hosts, then Frappe's own accept.
+	"frappe.website.doctype.web_form.web_form.accept": "public_site_router.site_forms.accept",
 	# Builder's own app menu (only called where Builder is installed).
 	"builder.api.get_apps": "public_site_router.app_hosts.get_builder_apps",
 }

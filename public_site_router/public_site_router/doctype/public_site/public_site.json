@@ -35,7 +35,11 @@
   "ga4_measurement_id",
   "column_break_analytics",
   "matomo_url",
-  "matomo_site_id"
+  "matomo_site_id",
+  "form_protection_section",
+  "turnstile_site_key",
+  "column_break_forms",
+  "turnstile_secret_key"
  ],
  "fields": [
   {
@@ -216,6 +220,27 @@
    "fieldname": "matomo_site_id",
    "fieldtype": "Data",
    "label": "Matomo Site ID"
+  },
+  {
+   "fieldname": "form_protection_section",
+   "fieldtype": "Section Break",
+   "label": "Form Protection"
+  },
+  {
+   "description": "Cloudflare Turnstile site key. Adds Turnstile to every page of this site and a widget to each Web Form.",
+   "fieldname": "turnstile_site_key",
+   "fieldtype": "Data",
+   "label": "Turnstile Site Key"
+  },
+  {
+   "fieldname": "column_break_forms",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Cloudflare Turnstile secret key. With it, every Web Form submission from this site's hosts must pass Turnstile.",
+   "fieldname": "turnstile_secret_key",
+   "fieldtype": "Password",
+   "label": "Turnstile Secret Key"
   }
  ],
  "links": [],

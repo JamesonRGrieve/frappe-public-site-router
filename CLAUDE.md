@@ -8,7 +8,8 @@ public websites, each isolated to its own host names. No Frappe fork: it uses Fr
 
 - **Public Site**: `site_name`, `enabled`, `company`, `route_prefix` (one lowercase URL segment,
   unique; by convention the primary domain with its dots as hyphens, e.g. `zephyrex-ca`), analytics
-  (`view_tracking`, `visitor_ids`, `ga4_measurement_id`, `matomo_url`, `matomo_site_id`), `home_route` (under the prefix, default `home`), `webshop_store` (name of a
+  (`view_tracking`, `visitor_ids`, `ga4_measurement_id`, `matomo_url`, `matomo_site_id`), form protection
+  (`turnstile_site_key`, `turnstile_secret_key`; see **Form protection**), `home_route` (under the prefix, default `home`), `webshop_store` (name of a
   frappe-webshop fork `Webshop Store`, optional), `blog_category` (name of a blog-app `Blog Category`,
   optional, one site per category), `standalone_pages` (see **Page chrome**), `not_found_route` and
   `privacy_route` (routes under the prefix; see **Routing** and **Analytics**), `security_headers`, `content_signal`,
@@ -148,6 +149,19 @@ Per Public Site, any combination of providers, each added to every page of that 
 
 Values are validated on save and re-validated before they reach a snippet; strings are embedded with
 `json.dumps`. Saving a Public Site clears the website page cache so a change shows at once.
+
+## Form protection (`forms.py` pure, `site_forms.py` Frappe)
+
+- **Cloudflare Turnstile** per Public Site. With `turnstile_site_key` (validated `<digit>x…`), the
+  `update_website_context` hook puts Cloudflare's `api.js` in every page's head, so the protection is in the served
+  HTML. It also adds a loader that renders one `.cf-turnstile` widget (appearance `interaction-only`) inside each Web
+  Form on the page (`form[data-web-form]`), before its submit button.
+- **Verification**: `override_whitelisted_methods` replaces `frappe.website.doctype.web_form.web_form.accept`. On a
+  host whose Public Site has `turnstile_secret_key` (a Password field), the submission must carry
+  `cf-turnstile-response`, and Cloudflare's `siteverify` must answer `success` for one of the site's hosts. Otherwise
+  it is refused with a message asking the visitor to retry. Every other host gets Frappe's own `accept` unchanged.
+- A site's form script must send the widget's `cf-turnstile-response` value with the Web Form `accept` call. A site
+  with only the site key shows the widget but nothing is enforced. Set the secret too.
 
 ## App Hosts (`app_routing.py` pure, `app_hosts.py` Frappe)
 

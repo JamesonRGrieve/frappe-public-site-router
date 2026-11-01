@@ -160,7 +160,9 @@ Values are validated on save and re-validated before they reach a snippet; strin
   host whose Public Site has `turnstile_secret_key` (a Password field), the submission must carry
   `cf-turnstile-response`, and Cloudflare's `siteverify` must answer `success` for one of the site's hosts. Otherwise
   it is refused with a message asking the visitor to retry. Every other host gets Frappe's own `accept` unchanged.
-- A site's form script must send the widget's `cf-turnstile-response` value with the Web Form `accept` call. A site
+- **No change to a site's form script is needed:** the loader wraps `fetch`. A Web Form `accept` call whose
+  `URLSearchParams` body has no `cf-turnstile-response` gets the token of the widget in the submitting form (else the
+  page's last widget). After the call, the loader resets the widgets so a second submission gets a fresh token. A site
   with only the site key shows the widget but nothing is enforced. Set the secret too.
 
 ## App Hosts (`app_routing.py` pure, `app_hosts.py` Frappe)

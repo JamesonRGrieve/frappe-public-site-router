@@ -37,6 +37,12 @@ class TestHeadHtml:
 		assert "cf-turnstile" in html
 		assert f'"{KEY}"' in html
 
+	def test_loader_attaches_the_token_to_web_form_submissions(self):
+		html = forms.head_html(KEY)
+		assert f'"{forms.ACCEPT_PATH}"' in html
+		assert f'"{forms.RESPONSE_FIELD}"' in html
+		assert "window.fetch" in html and "turnstile.reset" in html
+
 	def test_key_cannot_close_the_script(self):
 		assert "</script><script>" not in forms.head_html(KEY).replace(
 			f'<script src="{forms.SCRIPT_URL}" async defer></script>\n<script>', ""

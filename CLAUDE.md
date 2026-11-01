@@ -119,6 +119,12 @@ standard footer. The head keeps `head_html` (canonical, favicon, analytics) and 
 lands on the `window.frappe` object base.html creates. Login, webshop, blog and Not Found pages keep
 Frappe's assets: their styling comes from those bundles.
 
+**Hero preload** (standalone Page Builder pages): the head starts with `<link rel="preload" as="image">` for the
+page's first `<img fetchpriority="high">` that isn't lazy (`chrome.hero_preload`; its `srcset`/`sizes` become
+`imagesrcset`/`imagesizes`, so the same candidate is fetched), ahead of the router's scripts
+(`chrome.prepend_head_html`). A site's content links its stylesheets and font preloads in the body, before the hero;
+without this a phone found the image behind them (3S Hub, Lighthouse mobile LCP 2.8 s, 2026-11-01).
+
 ## Analytics (`analytics.py` pure, `site_analytics.py` Frappe)
 
 Per Public Site, any combination of providers, each added to every page of that site by the

@@ -93,3 +93,60 @@ class TestWrapMain:
 		out = chrome.wrap_main(html)
 		assert '<main id="main"><section data-main-content>A<br>B</section></main><script>' in out
 		assert out.replace('<main id="main">', "").replace("</main>", "") == html
+
+
+class TestHeroPreload:
+	def test_first_high_priority_image_with_its_candidates(self):
+		html = (
+			'<img src="/files/logo.svg" alt="">'
+			'<img src="/files/a-1280w.webp" srcset="/files/a-480w.webp 480w, /files/a-1280w.webp 1280w" '
+			'sizes="100vw" fetchpriority="high" alt="A">'
+			'<img src="/files/b.webp" fetchpriority="high" alt="B">'
+		)
+		assert chrome.hero_preload(html) == (
+			'<link rel="preload" as="image" href="/files/a-1280w.webp" '
+			'imagesrcset="/files/a-480w.webp 480w, /files/a-1280w.webp 1280w" imagesizes="100vw" fetchpriority="high">'
+		)
+
+	def test_without_srcset_only_the_src(self):
+		assert chrome.hero_preload('<img src="/files/a.webp" fetchpriority="HIGH">') == (
+			'<link rel="preload" as="image" href="/files/a.webp" fetchpriority="high">'
+		)
+
+	@pytest.mark.parametrize(
+		"html",
+		[
+			"",
+			None,
+			'<img src="/files/a.webp">',
+			'<img src="/files/a.webp" fetchpriority="low">',
+			'<img src="/files/a.webp" fetchpriority="high" loading="lazy">',
+			'<img fetchpriority="high">',
+		],
+	)
+	def test_no_hero_no_preload(self, html):
+		assert chrome.hero_preload(html) == ""
+
+	def test_attribute_values_are_escaped(self):
+		out = chrome.hero_preload(
+			'<img src="/files/a&quot;b.webp" sizes="x&quot;><script>" srcset="/s 1w" fetchpriority="high">'
+		)
+		assert '"><script>' not in out
+		assert 'href="/files/a&quot;b.webp"' in out
+
+
+class TestPrependHeadHtml:
+	def test_goes_first_in_head_html(self):
+		context = {"head_html": "<script>analytics()</script>"}
+		chrome.prepend_head_html(context, "<link rel=preload>")
+		assert context["head_html"] == "<link rel=preload><script>analytics()</script>"
+
+	def test_builder_page_gets_it_first_in_its_own_head_too(self):
+		context = {"head_html": "", chrome.BUILDER_HEAD_HTML: "<meta>"}
+		chrome.prepend_head_html(context, "<link rel=preload>")
+		assert context[chrome.BUILDER_HEAD_HTML] == "<link rel=preload><meta>"
+
+	def test_nothing_to_add_leaves_the_context_alone(self):
+		context = {"head_html": "<x>"}
+		chrome.prepend_head_html(context, "")
+		assert context == {"head_html": "<x>"}

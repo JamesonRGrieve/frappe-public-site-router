@@ -5,6 +5,7 @@
 A standalone page carries only what its own content brings: Frappe's website stylesheets and scripts, its standard
 footer and its page wrapper are left out."""
 
+from html import escape
 from html.parser import HTMLParser
 
 # The site's own pages. Login, webshop, blog and Not Found pages are Frappe's or another app's, styled by their
@@ -66,6 +67,54 @@ def wrap_main(html):
 		return html
 	first, last = marked[0][0], marked[-1][1]
 	return f'{html[:first]}<main id="main">{html[first:last]}</main>{html[last:]}'
+
+
+class _Hero(HTMLParser):
+	"""The attributes of the first ``<img fetchpriority="high">`` that isn't lazy-loaded."""
+
+	def __init__(self):
+		super().__init__()
+		self.attrs = None
+
+	def handle_starttag(self, tag, attrs):
+		if self.attrs is not None or tag != "img":
+			return
+		found = {name: value or "" for name, value in attrs}
+		if (
+			found.get("fetchpriority", "").lower() == "high"
+			and found.get("loading", "").lower() != "lazy"
+			and found.get("src")
+		):
+			self.attrs = found
+
+
+def hero_preload(html):
+	"""A ``<link rel="preload" as="image">`` for the page's hero: its first ``<img fetchpriority="high">`` (with its
+	srcset and sizes, so the browser fetches the same candidate the img will use), or "" when it has none. In the head,
+	the request starts as soon as the head is parsed, ahead of the stylesheets and fonts the page's content links
+	before the image; a mobile browser would otherwise find it behind them."""
+	parser = _Hero()
+	parser.feed(html or "")
+	parser.close()
+	a = parser.attrs
+	if not a:
+		return ""
+	out = f'<link rel="preload" as="image" href="{escape(a["src"])}"'
+	if a.get("srcset"):
+		out += f' imagesrcset="{escape(a["srcset"])}"'
+		if a.get("sizes"):
+			out += f' imagesizes="{escape(a["sizes"])}"'
+	return out + ' fetchpriority="high">'
+
+
+def prepend_head_html(context, html):
+	"""Put ``html`` first in a page's head (``head_html``, and ``_head_html`` on a Builder Page), ahead of the router's
+	scripts, for a preload that should start before anything else."""
+	if not html:
+		return
+	context["head_html"] = html + (context.get("head_html") or "")
+	if BUILDER_HEAD_HTML in context:
+		context[BUILDER_HEAD_HTML] = html + (context.get(BUILDER_HEAD_HTML) or "")
 
 
 def add_head_html(context, html):

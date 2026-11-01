@@ -7,7 +7,8 @@ site's CSS anyway, and in the HTML it still hands crawlers the ERP's own links (
 
 On a site with Standalone Pages, its Web Pages also leave out Frappe's website stylesheets and scripts (render-blocking
 bundles the site's own design doesn't use), its standard footer and the ``<main>`` Frappe wraps page content in (the
-site's content brings its own main landmark)."""
+site's content brings its own main landmark), and their head starts with a preload of the page's hero image
+(chrome.hero_preload)."""
 
 from public_site_router import chrome
 from public_site_router.router import get_request_site
@@ -32,6 +33,7 @@ def update_website_context(context):
 		context.template = STANDALONE_WEB_PAGE
 		if context.get("page_builder_html"):
 			context.page_builder_html = chrome.wrap_main(context.page_builder_html)
+			chrome.prepend_head_html(context, chrome.hero_preload(context.page_builder_html))
 		context.web_include_css = []
 		context.web_include_js = []
 		context.web_include_icons = []

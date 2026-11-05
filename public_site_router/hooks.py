@@ -37,6 +37,18 @@ update_website_context = [
 	"public_site_router.app_hosts.update_website_context",
 ]
 
+# The apps screen's "Web Pages" tile: website editors (Website Manager, not System Manager) cannot open Frappe's
+# Framework app, so this is the app they land in and pick as their default.
+add_to_apps_screen = [
+	{
+		"name": "public_site_router",
+		"logo": "/assets/public_site_router/images/web-pages.svg",
+		"title": "Web Pages",
+		"route": "/desk/web-page",
+		"has_permission": "public_site_router.web_pages_app.can_open_web_pages",
+	}
+]
+
 # App Hosts: on an app's own host, / opens the app and a signed-out visitor is handed off to the login host.
 before_request = ["public_site_router.app_hosts.before_request"]
 

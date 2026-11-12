@@ -58,8 +58,12 @@ def check_submission(site, form_dict) -> None:
 
 @frappe.whitelist(allow_guest=True)
 def accept(web_form, data, *args, **kwargs):
-	"""Frappe's Web Form ``accept``, after the Turnstile check on a protected Public Site's hosts."""
+	"""Frappe's Web Form ``accept``, after the Turnstile check on a protected Public Site's hosts.
+
+	Frappe calls a whitelisted method with the whole ``form_dict`` (``cmd``, the Turnstile token field, …), so this
+	override takes extra arguments, but Frappe's own ``accept(web_form, data)`` takes none: only those two are passed
+	on (forwarding the rest made every guest submission fail with ``TypeError: … unexpected keyword argument 'cmd'``)."""
 	site = get_request_site()
 	if site:
 		check_submission(site, frappe.form_dict)
-	return frappe_accept(web_form, data, *args, **kwargs)
+	return frappe_accept(web_form, data)

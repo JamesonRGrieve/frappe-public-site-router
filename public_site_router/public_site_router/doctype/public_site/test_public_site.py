@@ -849,3 +849,43 @@ class TestPublicSiteAnalytics(FrappeTestCase):
 		self.assertEqual(frappe.db.get_value("Public Site", renamed, "site_name"), renamed)
 		self.assertEqual(frappe.db.get_value("Web Page View", view.name, "public_site"), renamed)
 		self.assertEqual(get_request_site().name, renamed)
+
+
+class TestFormProtectionOnNotFound(FrappeTestCase):
+	"""A protected site's Not Found page carries the Turnstile script too: it renders the site's header and footer,
+	whose forms (zephyrex.ca's Contact popover) are refused with 403 without a token (2026-11-13)."""
+
+	KEY = "0x4AAAAAAATestSiteKey"
+
+	def setUp(self):
+		frappe.set_user("Administrator")
+		self.site = make_site(ZX, "zx", ["zephyrex.test"])
+		self.site.turnstile_site_key = self.KEY
+		self.site.save()
+		clear_site_map()
+
+	def head(self, endpoint, status=None):
+		from public_site_router import site_forms
+
+		on_host("zephyrex.test")
+		frappe.local.path = endpoint
+		frappe.local.flags.public_site_endpoint = endpoint
+		context = frappe._dict({"head_html": "", "metatags": frappe._dict()})
+		if status:
+			context.http_status_code = status
+		site_forms.update_website_context(context)
+		return context.head_html
+
+	def test_turnstile_on_a_normal_page(self):
+		self.assertIn("challenges.cloudflare.com/turnstile", self.head("zx/about"))
+
+	def test_turnstile_on_the_not_found_page(self):
+		self.assertIn("challenges.cloudflare.com/turnstile", self.head("zx/not-found", status=404))
+
+	def test_no_turnstile_off_a_site_host(self):
+		from public_site_router import site_forms
+
+		on_host("erp.example.test")
+		context = frappe._dict({"head_html": "", "metatags": frappe._dict()})
+		site_forms.update_website_context(context)
+		self.assertNotIn("turnstile", context.head_html)

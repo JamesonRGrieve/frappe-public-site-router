@@ -37,7 +37,7 @@ def site_forms(monkeypatch):
 	}
 	router = types.ModuleType("public_site_router.router")
 	router.get_request_site = lambda: None  # a host with no Public Site: plain Frappe accept
-	router.page_site = lambda _context: None
+	router.page_site_or_not_found = lambda _context: None
 	chrome = types.ModuleType("public_site_router.chrome")
 	chrome.add_head_html = lambda *_a: None
 	modules["public_site_router.router"] = router

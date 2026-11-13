@@ -12,14 +12,15 @@ from frappe import _
 from frappe.website.doctype.web_form.web_form import accept as frappe_accept
 
 from public_site_router import chrome, forms
-from public_site_router.router import get_request_site, page_site
+from public_site_router.router import get_request_site, page_site_or_not_found
 
 VERIFY_TIMEOUT_SECONDS = 10
 
 
 def update_website_context(context):
-	"""update_website_context hook: the Turnstile script and widget loader on a protected site's pages."""
-	page = page_site(context)
+	"""update_website_context hook: the Turnstile script and widget loader on a protected site's pages, its Not Found
+	page included (the Contact popover in its footer was refused with 403 for want of a token, 2026-11-13)."""
+	page = page_site_or_not_found(context)
 	if not page:
 		return
 	site, _endpoint = page

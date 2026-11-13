@@ -133,6 +133,17 @@ def page_site(context):
 	return site, endpoint
 
 
+def page_site_or_not_found(context):
+	"""``(site, endpoint)`` like ``page_site``, but also on the site's own Not Found page: it renders the site's header
+	and footer, with their forms (zephyrex.ca's Contact popover), so it needs what makes those forms work."""
+	site = get_request_site()
+	resolved = frappe.local.flags.get("public_site_endpoint")
+	endpoint = (resolved or getattr(frappe.local, "path", None) or context.get("path") or "").strip("/")
+	if not site or endpoint in TECHNICAL_ROUTES:
+		return None
+	return site, endpoint
+
+
 def get_request_store():
 	"""webshop_store_resolver hook (frappe-webshop fork): this request's Webshop Store."""
 	site = get_request_site()

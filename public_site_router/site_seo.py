@@ -98,12 +98,23 @@ def bing_site_auth_xml():
 	return seo.bing_site_auth_xml(code)
 
 
+HTTP_NOT_FOUND = 404
+
+
+def is_not_found(context):
+	return context.get("http_status_code") == HTTP_NOT_FOUND or bool(
+		frappe.local.flags.get("public_site_not_found")
+	)
+
+
 def update_website_context(context):
 	"""update_website_context hook: canonical link, Open Graph URL tags and the site's favicon on its pages."""
 	# A Builder Page's canonical_url arrives here as its raw field. On a normal page Builder renders it after this hook;
 	# on a page served as a 404 (the site's Not Found page) it doesn't, and would print the template itself. Blank, it
 	# prints no canonical, which is right for a 404.
-	if context.get("canonical_url") in seo.BUILDER_CANONICAL_TEMPLATES:
+	# Builder 1.35 renders it before this hook instead, into the missing page's own address, so a page served as a 404
+	# loses its canonical whatever form it arrives in (zephyrex.ca's Builder port, 2026-11-13).
+	if context.get("canonical_url") in seo.BUILDER_CANONICAL_TEMPLATES or is_not_found(context):
 		context.canonical_url = ""
 	page = page_site(context)
 	if not page:

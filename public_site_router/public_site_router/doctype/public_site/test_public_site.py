@@ -594,6 +594,15 @@ class TestPublicSiteSeo(FrappeTestCase):
 			site_seo.update_website_context(context)
 			self.assertEqual(context.canonical_url, "")
 
+	def test_not_found_builder_page_drops_a_canonical_builder_already_rendered(self):
+		# Builder 1.35 renders canonical_url before the hooks run: the 404 must still print none
+		on_host("zephyrex.test")
+		context = self.context(
+			"zx/missing", http_status_code=404, _head_html="", canonical_url="https://zephyrex.test/missing"
+		)
+		site_seo.update_website_context(context)
+		self.assertEqual(context.canonical_url, "")
+
 	def test_builder_page_off_a_site_host_names_its_own_address(self):
 		on_host("erp.example.test")
 		context = self.context("zx/about", _head_html="")
@@ -799,6 +808,9 @@ class TestPublicSiteAnalytics(FrappeTestCase):
 				base_url=f"https://{host}/", method="POST", headers={"Referer": referer, "User-Agent": "test"}
 			).get_environ()
 		)
+		# log_view is rate limited by client IP, which Frappe sets per request; a test sets its own rather than
+		# inheriting whatever an earlier test left behind
+		frappe.local.request_ip = "203.0.113.7"
 		before = frappe.db.count("Web Page View")
 		site_analytics.log_view(
 			referrer="https://search.test/?q=private", user_tz="America/Edmonton", source="news"

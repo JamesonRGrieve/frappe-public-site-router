@@ -12,7 +12,7 @@ public websites, each isolated to its own host names. No Frappe fork: it uses Fr
   (`turnstile_site_key`, `turnstile_secret_key`; see **Form protection**), `home_route` (under the prefix, default `home`), `webshop_store` (name of a
   frappe-webshop fork `Webshop Store`, optional), `blog_category` (name of a blog-app `Blog Category`,
   optional, one site per category), `standalone_pages` (see **Page chrome**), `not_found_route` and
-  `privacy_route` (routes under the prefix; see **Routing** and **Analytics**), `security_headers`, `content_signal`,
+  `privacy_route` (routes under the prefix; see **Routing** and **Analytics**), `security_headers`, `csp_mode` and `csp_sources` (see **Content Security Policy**), `content_signal`,
   `llms_txt` and `bing_site_auth` (see **SEO**), `domains` (child **Public Site Domain**, host
   names normalised to lowercase, no port; unique across sites).
 - **App Host** (named by `host`): `host`, `app_route`, `login_host`, `enabled`, `label`; see **App Hosts**.
@@ -73,6 +73,16 @@ The host → site map is cached (`public_site_router_site_map`) and cleared on P
   `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN` and `Referrer-Policy:
   strict-origin-when-cross-origin` (`seo.SECURITY_HEADERS`), unless the response already sets one. Set at
   the app, not the edge: HAProxy's header rewrites apply to every service behind the frontend.
+  The same hook keeps Frappe's script-readable session-info cookies (`system_user`, `full_name`, `user_id`,
+  `user_image`, `user_lang`; `router.INFO_COOKIES`) off the site's hosts: dropped for a guest, HttpOnly for a
+  signed-in user on a Standalone Pages site. It runs before Frappe flushes its cookie manager.
+  Static files (`/files`, `/assets`) are served by the ERP's web server, not Frappe, so their headers are set there.
+- **Content Security Policy** (`csp_mode`: off, Report only, Enforce; `csp_sources`; needs Security Headers):
+  `csp.policy()` builds the value from the site's own integrations. The base allows `'self'`, `'unsafe-inline'` CSS/JS
+  (Builder blocks carry their own), Google Fonts and https images, with `object-src 'none'`, `frame-ancestors 'self'`,
+  `base-uri 'self'` and `form-action 'self'`; GA4, Matomo and Turnstile each add only their origins. Extra CSP
+  Sources (`<directive> <source> …` per line) are validated on save. Report only sends
+  `Content-Security-Policy-Report-Only`; switch to Enforce once every page loads with no violation.
 - `/llms.txt` (`llms_txt`, Markdown, llmstxt.org) and `/BingSiteAuth.xml` (`bing_site_auth`, Bing
   Webmaster Tools' ownership code) are served only when set; otherwise they are 404s.
 - `update_website_context` hook: appends `<link rel="canonical">` to `head_html`, sets `og:url` and

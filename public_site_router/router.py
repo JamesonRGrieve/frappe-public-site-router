@@ -33,7 +33,7 @@ from urllib.parse import urlsplit, urlunsplit
 import frappe
 from frappe.website.path_resolver import resolve_path as frappe_resolve_path
 
-from public_site_router import seo
+from public_site_router import analytics, csp, seo
 from public_site_router.app_routing import normalize_host
 
 SITE_MAP_CACHE_KEY = "public_site_router_site_map"
@@ -41,6 +41,8 @@ HTTP_OK = 200
 HTTP_NOT_FOUND = 404
 OWN_RESOLVER = "public_site_router.router.resolve_path"
 ROUTED_DOCTYPES = ("Web Page", "Builder Page")
+# Frappe's session-info cookies, written without HttpOnly for its desk JavaScript (frappe/auth.py set_user_info).
+INFO_COOKIES = ("system_user", "full_name", "user_id", "user_image", "user_lang")
 # Website routes every Public Site host serves besides its own pages. builder_assets/tokens.css is Builder's
 # site-wide colour-token stylesheet, which every Builder Page links.
 TECHNICAL_ROUTES = frozenset({"404", "error", "message", "website_script.js", "builder_assets/tokens.css"})
@@ -259,10 +261,37 @@ def not_found_status(response, request):
 
 def security_headers(response, request):
 	"""after_request hook: on a site with Security Headers, every response on its hosts carries HSTS, nosniff, a
-	same-origin frame policy and a referrer policy, unless it already sets them."""
+	same-origin frame policy and a referrer policy, unless it already sets them; its Content-Security-Policy (or
+	the Report-Only form) when CSP is switched on; and none of Frappe's script-readable session-info cookies.
+
+	Frappe writes ``system_user``, ``full_name``, ``user_id``, ``user_image`` and ``user_lang`` on every response,
+	without HttpOnly, for its own desk JavaScript. A site host has no use for them: a guest's carry only "Guest", so
+	they are dropped, and a signed-in user's are made HttpOnly on a site whose pages load none of Frappe's scripts
+	(Standalone Pages). This hook runs before Frappe writes its cookies, so it edits them in the cookie manager."""
 	site = get_request_site()
-	if site and site.get("security_headers"):
-		response.headers.update(seo.missing_security_headers(set(response.headers.keys())))
+	if not (site and site.get("security_headers")):
+		return
+	response.headers.update(seo.missing_security_headers(set(response.headers.keys())))
+	mode = site.get("csp_mode") or ""
+	if mode in csp.MODES:
+		value = csp.policy(
+			ga4=bool(site.get("ga4_measurement_id")),
+			matomo_base=analytics.matomo_base(site.get("matomo_url") or "") or "",
+			turnstile=bool(site.get("turnstile_site_key")),
+			extra=site.get("csp_sources") or "",
+		)
+		for name, header_value in csp.header(mode, value).items():
+			response.headers.setdefault(name, header_value)
+	manager = getattr(frappe.local, "cookie_manager", None)
+	if manager is not None:
+		guest = getattr(frappe.session, "user", "Guest") == "Guest"
+		for name in INFO_COOKIES:
+			if name not in manager.cookies:
+				continue
+			if guest:
+				del manager.cookies[name]
+			elif site.get("standalone_pages"):
+				manager.cookies[name]["httponly"] = True
 
 
 def clean_location(site, location):

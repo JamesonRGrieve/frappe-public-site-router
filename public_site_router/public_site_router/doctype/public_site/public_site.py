@@ -6,7 +6,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.website.utils import clear_website_cache
 
-from public_site_router import analytics, forms, seo
+from public_site_router import analytics, csp, forms, seo
 from public_site_router.router import clear_site_map, normalize_host
 from public_site_router.site_editors import clear_scope_cache
 
@@ -25,6 +25,7 @@ class PublicSite(Document):
 		self.validate_form_protection()
 		self.validate_crawler_files()
 		self.validate_editors()
+		self.validate_csp()
 		self.home_route = self.home_route.strip("/")
 		for field in ("not_found_route", "privacy_route"):
 			route = (self.get(field) or "").strip().strip("/")
@@ -50,6 +51,16 @@ class PublicSite(Document):
 		# The site map and rendered pages (og:site_name) name the site; Frappe updates links to it.
 		clear_site_map()
 		clear_website_cache()
+
+	def validate_csp(self):
+		"""A bad Extra CSP Sources line is refused here, so it is never served (a broken policy would block the
+		site's own assets once enforced)."""
+		if self.csp_mode and self.csp_mode not in csp.MODES:
+			frappe.throw(_("Content Security Policy must be Report only or Enforce."))
+		try:
+			csp.parse_extra(self.csp_sources or "")
+		except ValueError as error:
+			frappe.throw(_("Extra CSP Sources: {0}").format(error))
 
 	def validate_editors(self):
 		seen = set()

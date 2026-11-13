@@ -23,6 +23,8 @@
   "favicon",
   "standalone_pages",
   "security_headers",
+  "csp_mode",
+  "csp_sources",
   "pages_section",
   "not_found_route",
   "column_break_pages",
@@ -149,6 +151,21 @@
    "fieldname": "security_headers",
    "fieldtype": "Check",
    "label": "Security Headers"
+  },
+  {
+   "depends_on": "security_headers",
+   "description": "Content-Security-Policy for every response on this site's hosts, built from the site's own integrations (Google Analytics, Matomo, Turnstile) plus Extra CSP Sources. Start with Report only: browsers report what the policy would block without blocking it. Switch to Enforce once every page loads with no violation.",
+   "fieldname": "csp_mode",
+   "fieldtype": "Select",
+   "label": "Content Security Policy",
+   "options": "\nReport only\nEnforce"
+  },
+  {
+   "depends_on": "csp_mode",
+   "description": "Origins this site loads beyond its own, its fonts and its switched-on integrations: one line per directive, e.g. <code>img-src https://images.example.com</code> or <code>frame-src https://www.youtube-nocookie.com</code>.",
+   "fieldname": "csp_sources",
+   "fieldtype": "Small Text",
+   "label": "Extra CSP Sources"
   },
   {
    "fieldname": "pages_section",

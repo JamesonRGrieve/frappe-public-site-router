@@ -35,16 +35,19 @@ CONSENT_TEXT = "Analytics cookies, to see which pages help? No ads."
 # The banner never covers a site's first screen: a compact card in the bottom-right corner on wider screens, and on
 # phones one slim full-width bar along the bottom (one or two short lines and two small buttons, ~64 px). A larger
 # card covered about a fifth of a phone's first screen, hiding heroes and calls to action (audit design notes,
-# 2026-11-01). Sites restyle .psr-consent if they want.
+# 2026-11-01). Sites restyle .psr-consent if they want. It looks the same on Web Pages and Builder Pages: Builder's
+# base CSS gives text elements Inter's variation settings and lets buttons inherit letter-spacing, so the banner
+# states both itself (zephyrex.ca's Builder port, 2026-11-13).
 CONSENT_CSS = (
 	".psr-consent{position:fixed;right:1rem;bottom:1rem;z-index:2147483000;box-sizing:border-box;"
 	"width:min(23rem,calc(100% - 2rem));display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;"
 	"padding:.7rem .85rem;background:#fff;color:#1a1a1a;border:1px solid rgba(0,0,0,.15);border-radius:.6rem;"
 	"box-shadow:0 6px 24px rgba(0,0,0,.16);font:400 14px/1.4 system-ui,sans-serif}"
+	".psr-consent,.psr-consent *{font-variation-settings:normal}"
 	".psr-consent p{flex:1 1 12rem;margin:0}.psr-consent a{color:inherit;text-decoration:underline}"
 	".psr-consent__actions{display:flex;gap:.4rem;flex:0 0 auto}.psr-consent button{min-height:36px;"
 	"padding:.35rem .8rem;font:600 14px/1 system-ui,sans-serif;border-radius:.45rem;cursor:pointer;"
-	"border:1px solid #1a1a1a;background:#fff;color:#1a1a1a}"
+	"border:1px solid #1a1a1a;background:#fff;color:#1a1a1a;letter-spacing:normal}"
 	".psr-consent button[data-choice=granted]{background:#1a1a1a;color:#fff}"
 	".psr-consent button:focus-visible,.psr-consent a:focus-visible{outline:3px solid #1a5fd0;outline-offset:2px}"
 	"@media (max-width:640px){.psr-consent{right:0;bottom:0;width:100%;flex-wrap:nowrap;gap:.5rem;"

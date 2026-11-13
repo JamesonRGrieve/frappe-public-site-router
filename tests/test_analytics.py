@@ -243,3 +243,12 @@ class TestReferrer:
 	def test_empty(self):
 		assert analytics.clean_referrer(None) is None
 		assert analytics.clean_referrer("") is None
+
+
+def test_consent_banner_looks_the_same_on_builder_pages():
+	# Builder's base CSS sets font-variation-settings on text elements and lets buttons inherit letter-spacing
+	from public_site_router.analytics import CONSENT_CSS
+
+	assert ".psr-consent,.psr-consent *{font-variation-settings:normal}" in CONSENT_CSS
+	button = CONSENT_CSS.split(".psr-consent button{", 1)[1].split("}", 1)[0]
+	assert "letter-spacing:normal" in button

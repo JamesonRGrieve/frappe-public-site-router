@@ -17,6 +17,8 @@
   "blog_category",
   "domains_section",
   "domains",
+  "editors_section",
+  "editors",
   "branding_section",
   "favicon",
   "standalone_pages",
@@ -109,6 +111,19 @@
    "label": "Domains",
    "options": "Public Site Domain",
    "reqd": 1
+  },
+  {
+   "fieldname": "editors_section",
+   "fieldtype": "Section Break",
+   "label": "Editors",
+   "collapsible": 1,
+   "description": "Users who edit this site in Builder. Give each the Site Editor role: they then see and change only the pages, components and patterns of the sites that list them."
+  },
+  {
+   "fieldname": "editors",
+   "fieldtype": "Table",
+   "label": "Editors",
+   "options": "Public Site Editor"
   },
   {
    "fieldname": "branding_section",
@@ -244,7 +259,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-19 13:00:00.000000",
+ "modified": "2026-11-13 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Public Site Router",
  "name": "Public Site",

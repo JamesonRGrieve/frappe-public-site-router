@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# The test bench: the official ERPNext v16 image plus Builder, pinned to the commit production runs, and this app.
+# (Public Site links ERPNext's Company, and Frappe's test-record generator follows ERPNext's links to Payment
+# Gateway, so ERPNext and the payments app are installed too.) run.sh assembles the build context: public_site_router/ is a copy of this repository's working tree.
+# Frontend assets are not built: the tests drive the bench through its Python API only.
+ARG ERPNEXT_IMAGE
+FROM ${ERPNEXT_IMAGE}
+ARG BUILDER_REF
+ARG PAYMENTS_REF
+USER frappe
+WORKDIR /home/frappe/frappe-bench
+RUN git clone --quiet https://github.com/frappe/builder apps/builder \
+	&& git -C apps/builder checkout --quiet "${BUILDER_REF}" \
+	&& git clone --quiet https://github.com/frappe/payments apps/payments \
+	&& git -C apps/payments checkout --quiet "${PAYMENTS_REF}" \
+	&& env/bin/pip install --quiet -e apps/builder -e apps/payments
+# Numeric owner: the v16.50 image's frappe user (uid 1000) is in the root group, with no group named frappe.
+COPY --chown=1000:0 public_site_router apps/public_site_router
+RUN env/bin/pip install --quiet --no-deps -e apps/public_site_router

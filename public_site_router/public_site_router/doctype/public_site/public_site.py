@@ -8,6 +8,7 @@ from frappe.website.utils import clear_website_cache
 
 from public_site_router import analytics, forms, seo
 from public_site_router.router import clear_site_map, normalize_host
+from public_site_router.site_editors import clear_scope_cache
 
 PREFIX_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 ROUTE_PATTERN = re.compile(r"^[a-z0-9][a-z0-9/_-]*$")
@@ -23,6 +24,7 @@ class PublicSite(Document):
 		self.validate_analytics()
 		self.validate_form_protection()
 		self.validate_crawler_files()
+		self.validate_editors()
 		self.home_route = self.home_route.strip("/")
 		for field in ("not_found_route", "privacy_route"):
 			route = (self.get(field) or "").strip().strip("/")
@@ -36,6 +38,7 @@ class PublicSite(Document):
 
 	def on_update(self):
 		clear_site_map()
+		clear_scope_cache()
 		# Rendered pages carry the site's analytics and canonical host; drop them so a change shows at once.
 		clear_website_cache()
 
@@ -47,6 +50,13 @@ class PublicSite(Document):
 		# The site map and rendered pages (og:site_name) name the site; Frappe updates links to it.
 		clear_site_map()
 		clear_website_cache()
+
+	def validate_editors(self):
+		seen = set()
+		for row in self.editors:
+			if row.user in seen:
+				frappe.throw(_("{0} is listed twice under Editors.").format(row.user))
+			seen.add(row.user)
 
 	def validate_route_prefix(self):
 		self.route_prefix = (self.route_prefix or "").strip("/").lower()

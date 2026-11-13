@@ -49,8 +49,12 @@ add_to_apps_screen = [
 	}
 ]
 
-# App Hosts: on an app's own host, / opens the app and a signed-out visitor is handed off to the login host.
-before_request = ["public_site_router.app_hosts.before_request"]
+# App Hosts: on an app's own host, / opens the app and a signed-out visitor is handed off to the login host. Site
+# Editors: Builder's AI agent and its every-site methods are refused.
+before_request = [
+	"public_site_router.app_hosts.before_request",
+	"public_site_router.site_editors.before_request",
+]
 
 # Frappe apps' own app menus (e.g. CRM's) read frappe.apps.get_apps; on a login or app host it links each app with
 # an App Host on its host.
@@ -60,6 +64,28 @@ override_whitelisted_methods = {
 	"frappe.website.doctype.web_form.web_form.accept": "public_site_router.site_forms.accept",
 	# Builder's own app menu (only called where Builder is installed).
 	"builder.api.get_apps": "public_site_router.app_hosts.get_builder_apps",
+	# Site Editors: Builder methods that write past the per-document checks, checked first (site_editors).
+	"builder.api.duplicate_page": "public_site_router.site_editors.duplicate_page",
+	"builder.api.update_page_folder": "public_site_router.site_editors.update_page_folder",
+	"builder.api.reorder_client_scripts": "public_site_router.site_editors.reorder_client_scripts",
+	"builder.api.sync_component": "public_site_router.site_editors.sync_component",
+	"builder.api.get_component_data": "public_site_router.site_editors.get_component_data",
+}
+
+# Site Editors (Public Site → Editors, role Site Editor): Builder documents of their own sites only.
+has_permission = {
+	"Builder Page": "public_site_router.site_editors.page_permission",
+	"Builder Component": "public_site_router.site_editors.component_permission",
+	"Block Template": "public_site_router.site_editors.pattern_permission",
+	"Builder Client Script": "public_site_router.site_editors.script_permission",
+	"Builder Snapshot": "public_site_router.site_editors.snapshot_permission",
+}
+permission_query_conditions = {
+	"Builder Page": "public_site_router.site_editors.page_conditions",
+	"Builder Component": "public_site_router.site_editors.component_conditions",
+	"Block Template": "public_site_router.site_editors.pattern_conditions",
+	"Builder Client Script": "public_site_router.site_editors.script_conditions",
+	"Builder Snapshot": "public_site_router.site_editors.snapshot_conditions",
 }
 
 # Web Page View's public_site field (views stamped with their site), and the canonical-URL template on site Builder
@@ -67,10 +93,21 @@ override_whitelisted_methods = {
 after_migrate = [
 	"public_site_router.site_analytics.ensure_custom_fields",
 	"public_site_router.site_seo.backfill_builder_canonicals",
+	"public_site_router.site_editors.ensure_role",
 ]
 
 # A site's Builder Pages name their clean URL as canonical (Builder prints its own canonical link from canonical_url).
-doc_events = {"Builder Page": {"validate": "public_site_router.site_seo.set_builder_canonical"}}
+# Site Editors' saves are checked against the stored document too (site_editors).
+doc_events = {
+	"Builder Page": {
+		"validate": [
+			"public_site_router.site_seo.set_builder_canonical",
+			"public_site_router.site_editors.validate_page",
+		]
+	},
+	"Builder Component": {"validate": "public_site_router.site_editors.validate_component"},
+	"Block Template": {"validate": "public_site_router.site_editors.validate_pattern"},
+}
 
 # Answers the frappe-webshop fork's multi-store hook: which Webshop Store serves this request.
 webshop_store_resolver = "public_site_router.router.get_request_store"

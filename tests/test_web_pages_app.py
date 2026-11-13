@@ -12,7 +12,9 @@ HOOKS = pathlib.Path(__file__).resolve().parents[1] / "public_site_router" / "ho
 def _apps_screen():
 	tree = ast.parse(HOOKS.read_text())
 	for node in tree.body:
-		if isinstance(node, ast.Assign) and any(getattr(t, "id", "") == "add_to_apps_screen" for t in node.targets):
+		if isinstance(node, ast.Assign) and any(
+			getattr(t, "id", "") == "add_to_apps_screen" for t in node.targets
+		):
 			return ast.literal_eval(node.value)
 	raise AssertionError("hooks.py declares no add_to_apps_screen")
 

@@ -80,3 +80,22 @@ class TestHeader:
 		assert csp.header("Report only", "v") == {"Content-Security-Policy-Report-Only": "v"}
 		assert csp.header("Enforce", "v") == {"Content-Security-Policy": "v"}
 		assert csp.header("", "v") == {}
+
+
+class TestFrameOptions:
+	def test_enforced_frame_ancestors_replaces_x_frame_options(self):
+		assert csp.replaces_frame_options("Enforce", "frame-ancestors 'self' https://showcase.example.com")
+
+	def test_report_only_keeps_x_frame_options(self):
+		assert not csp.replaces_frame_options("Report only", "frame-ancestors https://showcase.example.com")
+
+	def test_no_frame_ancestors_keeps_x_frame_options(self):
+		assert not csp.replaces_frame_options("Enforce", "frame-src https://example.com")
+		assert not csp.replaces_frame_options("Enforce", "")
+
+	def test_invalid_extra_keeps_x_frame_options(self):
+		assert not csp.replaces_frame_options("Enforce", "frame-ancestors")
+
+	def test_frame_ancestors_extra_lands_in_policy(self):
+		d = directives(csp.policy(extra="frame-ancestors https://showcase.example.com"))
+		assert d["frame-ancestors"] == ["'self'", "https://showcase.example.com"]

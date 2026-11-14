@@ -76,6 +76,19 @@ def parse_extra(text: str) -> dict[str, list[str]]:
 	return extra
 
 
+def replaces_frame_options(mode: str, extra: str) -> bool:
+	"""True when the site's enforced CSP names its own ``frame-ancestors`` in Extra CSP Sources. That directive then
+	decides who may frame the site, and X-Frame-Options (``SAMEORIGIN``, which can't name another origin) must not be
+	sent beside it: OMG's showcase kiosk frames dev.obsessedmediagroup.ca pages from its own host (2026-11-14).
+	Report-only never replaces it, since browsers only let an enforced frame-ancestors override X-Frame-Options."""
+	if mode != "Enforce":
+		return False
+	try:
+		return "frame-ancestors" in parse_extra(extra)
+	except ValueError:
+		return False
+
+
 def policy(*, ga4: bool = False, matomo_base: str = "", turnstile: bool = False, extra: str = "") -> str:
 	"""The Content-Security-Policy value for a site with these integrations switched on."""
 	d: dict[str, list[str]] = {

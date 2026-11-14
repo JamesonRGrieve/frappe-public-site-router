@@ -282,8 +282,11 @@ def security_headers(response, request):
 	site = get_request_site()
 	if not (site and site.get("security_headers")):
 		return
-	response.headers.update(seo.missing_security_headers(set(response.headers.keys())))
 	mode = site.get("csp_mode") or ""
+	missing = seo.missing_security_headers(set(response.headers.keys()))
+	if csp.replaces_frame_options(mode, site.get("csp_sources") or ""):
+		missing.pop("X-Frame-Options", None)
+	response.headers.update(missing)
 	if mode in csp.MODES:
 		value = csp.policy(
 			ga4=bool(site.get("ga4_measurement_id")),

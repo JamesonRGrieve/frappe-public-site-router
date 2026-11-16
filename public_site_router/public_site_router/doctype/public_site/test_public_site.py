@@ -137,9 +137,10 @@ class TestPublicSiteRouting(FrappeTestCase):
 				resolve_path(route)
 
 	def test_unpublished_by_site_is_404(self):
-		# global pages, ERPNext's generic about/contact, desk and the global sitemap
+		# global pages, ERPNext's generic about/contact and desk. (sitemap.xml is no longer here: a site host serves
+		# its own sitemap there, test_sitemap_and_robots_are_the_sites_own.)
 		on_host("zephyrex.test")
-		for route in ("shared-legal", "about", "contact", "contact/new", "app", "sitemap.xml"):
+		for route in ("shared-legal", "about", "contact", "contact/new", "app"):
 			with self.subTest(route=route), self.assertRaises(frappe.PageDoesNotExistError):
 				resolve_path(route)
 
@@ -534,7 +535,8 @@ class TestPublicSiteSeo(FrappeTestCase):
 		xml = site_seo.sitemap_xml()
 		for path in ("", "about", "infrastructure/firewalls"):
 			self.assertIn(f"<loc>https://zephyrex.test/{path}</loc>", xml)
-		for absent in ("zx/", "/home<", "draft", "shared-legal", "3sh", "www."):
+		# "www.zephyrex" rather than "www.": the sitemap's own namespace is http://www.sitemaps.org/
+		for absent in ("zx/", "/home<", "draft", "shared-legal", "3sh", "www.zephyrex"):
 			self.assertNotIn(absent, xml)
 
 	def test_robots_names_the_sites_sitemap(self):
@@ -632,6 +634,19 @@ class TestPublicSiteSeo(FrappeTestCase):
 		erp_image = frappe.utils.get_url("/files/card.png")
 		context = self.context("zx/about", metatags=frappe._dict({"image": erp_image, "og:image": erp_image}))
 		site_seo.update_website_context(context)
+		self.assertEqual(context.metatags["og:image"], "https://zephyrex.test/files/card.png")
+		self.assertEqual(context.metatags["image"], "https://zephyrex.test/files/card.png")
+
+	def test_images_on_a_separate_erp_host_move_to_the_site_host(self):
+		# Production: the ERP has its own https host (get_url() is a whole URL). The rewrite must compare hosts, not
+		# the URL's scheme: zephyrex.ca's og:image stayed on erp.zephyrex.ca until this was fixed (2026-11-16).
+		from unittest.mock import patch
+
+		on_host("zephyrex.test")
+		erp_image = "https://erp.example.test/files/card.png"
+		context = self.context("zx/about", metatags=frappe._dict({"image": erp_image, "og:image": erp_image}))
+		with patch.object(site_seo, "get_url", return_value="https://erp.example.test"):
+			site_seo.update_website_context(context)
 		self.assertEqual(context.metatags["og:image"], "https://zephyrex.test/files/card.png")
 		self.assertEqual(context.metatags["image"], "https://zephyrex.test/files/card.png")
 

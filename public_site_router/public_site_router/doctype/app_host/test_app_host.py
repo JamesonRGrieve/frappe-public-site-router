@@ -115,7 +115,11 @@ class TestAppHost(FrappeTestCase):
 	def assert_denied(self):
 		self.assertEqual(frappe.local.response.get("type"), "page")
 		self.assertEqual(frappe.local.response.get("http_status_code"), app_hosts.HTTP_FORBIDDEN)
-		self.assertNotEqual(frappe.local.cookie_manager.cookies.get("sid", {}).get("value"), self.sid)
+		issued = frappe.local.cookie_manager.cookies.get("sid", {}).get("value")
+		if self.sid:
+			self.assertNotEqual(issued, self.sid)
+		else:  # no session was minted (an unknown token): no signed-in sid may be issued either
+			self.assertFalse(issued and frappe.session.user != "Guest")
 
 	# Validation
 
@@ -272,7 +276,9 @@ class TestAppHost(FrappeTestCase):
 		self.assertEqual(sid["max_age"], get_expiry_in_seconds())
 		self.assertEqual(cookies["system_user"]["value"], "yes")
 		self.assertEqual(cookies["user_id"]["value"], USER)
-		for name in ("full_name", "user_image", "user_lang"):
+		# Frappe v16 sets user_image only for a user who has an image; the rest always
+		names = ("full_name", "user_lang", *(("user_image",) if frappe.db.get_value("User", USER, "user_image") else ()))
+		for name in names:
 			self.assertIn(name, cookies)
 			self.assertFalse(cookies[name]["httponly"])
 		self.assertIn(app_hosts.STATE_COOKIE, frappe.local.cookie_manager.to_delete)
@@ -348,14 +354,15 @@ class TestAppHost(FrappeTestCase):
 		)
 
 	def test_desk_links_apps_on_their_hosts(self):
-		for host in (LOGIN_HOST, HR_HOST):
+		# on the login host its own apps stay relative; on an app host every app without an App Host links to the
+		# login host (8ac7fe9: app hosts send other apps to the login host)
+		on_login_host = ["https://crm.apphost.test/crm", "/lms", "/desk"]
+		on_app_host = ["https://crm.apphost.test/crm", f"https://{LOGIN_HOST}/lms", f"https://{LOGIN_HOST}/desk"]
+		for host, expected in ((LOGIN_HOST, on_login_host), (HR_HOST, on_app_host)):
 			on_request(host, "/desk")
 			context = frappe._dict(boot=self.boot())
 			app_hosts.update_website_context(context)
-			self.assertEqual(
-				[app["app_route"] for app in context.boot.app_data],
-				["https://crm.apphost.test/crm", "/lms", "/desk"],
-			)
+			self.assertEqual([app["app_route"] for app in context.boot.app_data], expected)
 			self.assertEqual(
 				[app["route"] for app in context.boot.apps_data["apps"]],
 				["https://crm.apphost.test/crm", "https://hr.apphost.test/hr"],

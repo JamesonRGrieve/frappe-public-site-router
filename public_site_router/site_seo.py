@@ -6,6 +6,8 @@ that site's own (``router`` maps them to the ``www/public_site_*`` pages), and e
 link, ``og:url`` and ``og:site_name`` naming the site's canonical host, with absolute URLs Frappe built on
 the ERP's host moved onto it."""
 
+from urllib.parse import urlsplit
+
 import frappe
 from frappe.utils import get_url
 
@@ -124,7 +126,9 @@ def update_website_context(context):
 		return
 	site, endpoint = page
 	host = canonical_host(site)
-	erp_hosts = {normalize_host(get_url())}
+	# get_url() is a whole URL (https://erp.example); normalize_host wants a host, so take its netloc first. Given the
+	# URL it kept only "https", nothing matched, and ERP-host images and favicons stayed on the ERP host.
+	erp_hosts = {normalize_host(urlsplit(get_url()).netloc)}
 	url = seo.page_url(host, seo.clean_path(endpoint, site.route_prefix, site_home(site)))
 	set_canonical_parts(context, *seo.url_host_and_path(url))
 	# A Builder Page prints its own canonical link from canonical_url (BUILDER_CANONICAL_TEMPLATE, set on save), so a

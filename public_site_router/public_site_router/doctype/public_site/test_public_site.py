@@ -146,7 +146,17 @@ class TestPublicSiteRouting(FrappeTestCase):
 
 	def test_store_routes_404_without_store(self):
 		on_host("zephyrex.test")
-		for route in ("login", "me", "orders", "cart", "all-products", "product_search"):
+		for route in (
+			"login",
+			"me",
+			"orders",
+			"cart",
+			"all-products",
+			"product_search",
+			"auctions",
+			"auctions/x-abc123",
+			"auction-hold",
+		):
 			with self.subTest(route=route), self.assertRaises(frappe.PageDoesNotExistError):
 				resolve_path(route)
 
@@ -161,6 +171,11 @@ class TestPublicSiteRouting(FrappeTestCase):
 			"all-products",
 			"shop-by-category/x",
 			"order/SO-1",
+			"auctions",
+			"auctions/booster-box-6mlukb",
+			"auction-hold",
+			"square_hold",
+			"helcim_hold",
 		):
 			# passed through unchanged: resolved exactly as on a host with no Public Site
 			on_host("erp.example.test")

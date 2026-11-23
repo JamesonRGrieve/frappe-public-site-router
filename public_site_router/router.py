@@ -71,6 +71,11 @@ STORE_ACCOUNT_ROUTES = frozenset(
 STORE_PAGE_SEGMENTS = frozenset(
 	{"cart", "all-products", "shop-by-category", "product_search", "order", "wishlist", "customer_reviews"}
 )
+# frappe-auction's pages (first path segment), served like the webshop's own on a site with a Webshop Store:
+# the listing and each Auction (`auctions`, `auctions/<slug>`), the signed-in card-hold page, and the payment
+# apps' hold pages. frappe-auction scopes them to the host's store (a WebsiteGenerator with no_cache, so the
+# per-route page cache never carries one store's auctions to another host); never in a site's sitemap.
+AUCTION_PAGE_SEGMENTS = frozenset({"auctions", "auction-hold", "square_hold", "helcim_hold"})
 STORE_GENERATOR_DOCTYPES = ("Website Item", "Item Group")
 
 
@@ -211,6 +216,7 @@ def is_shared_route(site, path):
 	return (
 		path in STORE_ACCOUNT_ROUTES
 		or path.split("/", 1)[0] in STORE_PAGE_SEGMENTS
+		or path.split("/", 1)[0] in AUCTION_PAGE_SEGMENTS
 		or is_store_generator_route(path)
 	)
 

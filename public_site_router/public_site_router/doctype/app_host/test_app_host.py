@@ -277,7 +277,11 @@ class TestAppHost(FrappeTestCase):
 		self.assertEqual(cookies["system_user"]["value"], "yes")
 		self.assertEqual(cookies["user_id"]["value"], USER)
 		# Frappe v16 sets user_image only for a user who has an image; the rest always
-		names = ("full_name", "user_lang", *(("user_image",) if frappe.db.get_value("User", USER, "user_image") else ()))
+		names = (
+			"full_name",
+			"user_lang",
+			*(("user_image",) if frappe.db.get_value("User", USER, "user_image") else ()),
+		)
 		for name in names:
 			self.assertIn(name, cookies)
 			self.assertFalse(cookies[name]["httponly"])
@@ -357,7 +361,11 @@ class TestAppHost(FrappeTestCase):
 		# on the login host its own apps stay relative; on an app host every app without an App Host links to the
 		# login host (8ac7fe9: app hosts send other apps to the login host)
 		on_login_host = ["https://crm.apphost.test/crm", "/lms", "/desk"]
-		on_app_host = ["https://crm.apphost.test/crm", f"https://{LOGIN_HOST}/lms", f"https://{LOGIN_HOST}/desk"]
+		on_app_host = [
+			"https://crm.apphost.test/crm",
+			f"https://{LOGIN_HOST}/lms",
+			f"https://{LOGIN_HOST}/desk",
+		]
 		for host, expected in ((LOGIN_HOST, on_login_host), (HR_HOST, on_app_host)):
 			on_request(host, "/desk")
 			context = frappe._dict(boot=self.boot())

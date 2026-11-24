@@ -76,7 +76,9 @@ STORE_PAGE_SEGMENTS = frozenset(
 # apps' hold pages. frappe-auction scopes them to the host's store (a WebsiteGenerator with no_cache, so the
 # per-route page cache never carries one store's auctions to another host); never in a site's sitemap.
 AUCTION_PAGE_SEGMENTS = frozenset({"auctions", "auction-hold", "square_hold", "helcim_hold"})
-STORE_GENERATOR_DOCTYPES = ("Website Item", "Item Group")
+# The webshop's page generators and the field that publishes each (an Item Group is shown by its
+# website generator's condition field; it has no ``published``).
+STORE_GENERATOR_DOCTYPES = {"Website Item": "published", "Item Group": "show_in_website"}
 
 
 def get_site_map():
@@ -155,6 +157,18 @@ def get_request_store():
 	return (site.get("webshop_store") or None) if site else None
 
 
+def get_request_public_route(route):
+	"""webshop_route_resolver hook (frappe-webshop fork): the path a stored route is served at on this
+	request's host. A store page routed under the site's own prefix (``<prefix>/<slug>``, as an importer
+	names a business's items so two stores never collide) is linked as ``<slug>``; any other route, or
+	any request off a site host, is unchanged."""
+	site = get_request_site()
+	if not site or not route:
+		return route
+	prefix = f"{site.route_prefix}/"
+	return route[len(prefix) :] if route.startswith(prefix) else route
+
+
 def page_exists(route):
 	for doctype in ROUTED_DOCTYPES:
 		if frappe.db.table_exists(doctype) and frappe.db.exists(doctype, {"route": route, "published": 1}):
@@ -184,8 +198,8 @@ def is_web_form_route(route):
 def is_store_generator_route(route):
 	"""A published Website Item or Item Group page (the webshop's product and category pages)."""
 	return any(
-		frappe.db.table_exists(doctype) and frappe.db.exists(doctype, {"route": route, "published": 1})
-		for doctype in STORE_GENERATOR_DOCTYPES
+		frappe.db.table_exists(doctype) and frappe.db.exists(doctype, {"route": route, field: 1})
+		for doctype, field in STORE_GENERATOR_DOCTYPES.items()
 	)
 
 
@@ -240,6 +254,8 @@ def site_endpoint(site, path, prefixes):
 		raise frappe.PageDoesNotExistError  # the Not Found page is never a page of its own
 	if page_exists(candidate):
 		return candidate
+	if site.get("webshop_store") and is_store_generator_route(candidate):
+		return candidate  # the store's own product or category page, routed under its prefix
 	if is_site_blog_post(site, path) or is_shared_route(site, path):
 		return None
 	raise frappe.PageDoesNotExistError

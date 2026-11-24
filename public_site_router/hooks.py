@@ -113,3 +113,5 @@ doc_events = {
 
 # Answers the frappe-webshop fork's multi-store hook: which Webshop Store serves this request.
 webshop_store_resolver = "public_site_router.router.get_request_store"
+# And at which path a store page routed under the site's prefix is linked on its host.
+webshop_route_resolver = "public_site_router.router.get_request_public_route"

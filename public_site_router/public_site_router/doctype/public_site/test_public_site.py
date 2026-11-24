@@ -512,6 +512,73 @@ class TestPublicSiteWebshop(FrappeTestCase):
 		self.assertIn(f"<loc>https://zephyrex.test/{zx_route}</loc>", xml)
 		self.assertNotIn(hub_route, xml)
 
+	def test_prefixed_store_item_is_served_at_its_clean_path_on_its_own_host_only(self):
+		frappe.db.set_value("Website Item", self.zx_item, "route", "zx/etsy-mug", update_modified=False)
+		on_host("zephyrex.test")
+		self.assertEqual(resolve_path("etsy-mug"), "zx/etsy-mug")
+		with self.assertRaises(frappe.PageDoesNotExistError):
+			resolve_path("zx/etsy-mug")  # one URL per page: never by its prefixed route
+		on_host("3shub.test")
+		with self.assertRaises(frappe.PageDoesNotExistError):
+			resolve_path("etsy-mug")
+
+	def test_prefixed_store_item_group_is_served_at_its_clean_path(self):
+		group = frappe.get_doc(
+			{
+				"doctype": "Item Group",
+				"item_group_name": "_Test Etsy Section - ZX",
+				"parent_item_group": "All Item Groups",
+				"show_in_website": 1,
+				"route": "zx/etsy-section",
+			}
+		).insert()
+		on_host("zephyrex.test")
+		self.assertEqual(resolve_path("etsy-section"), "zx/etsy-section")
+		frappe.db.set_value("Item Group", group.name, "show_in_website", 0, update_modified=False)
+		with self.assertRaises(frappe.PageDoesNotExistError):
+			resolve_path("etsy-section")
+
+	def test_unpublished_prefixed_store_item_is_404(self):
+		frappe.db.set_value(
+			"Website Item", self.zx_item, {"route": "zx/etsy-mug", "published": 0}, update_modified=False
+		)
+		on_host("zephyrex.test")
+		with self.assertRaises(frappe.PageDoesNotExistError):
+			resolve_path("etsy-mug")
+
+	def test_public_route_drops_only_the_hosts_own_prefix(self):
+		from public_site_router.router import get_request_public_route
+
+		on_host("zephyrex.test")
+		self.assertEqual(get_request_public_route("zx/etsy-mug"), "etsy-mug")
+		self.assertEqual(get_request_public_route("3sh/etsy-mug"), "3sh/etsy-mug")
+		self.assertEqual(get_request_public_route("zxetsy-mug"), "zxetsy-mug")
+		self.assertEqual(get_request_public_route("plain-item"), "plain-item")
+		self.assertIsNone(get_request_public_route(None))
+		on_host("erp.example.test")
+		self.assertEqual(get_request_public_route("zx/etsy-mug"), "zx/etsy-mug")
+
+	def test_sitemap_lists_a_prefixed_store_item_at_its_clean_url(self):
+		frappe.db.set_value("Website Item", self.zx_item, "route", "zx/etsy-mug", update_modified=False)
+		on_host("zephyrex.test")
+		xml = site_seo.sitemap_xml()
+		self.assertIn("<loc>https://zephyrex.test/etsy-mug</loc>", xml)
+		self.assertNotIn("zx/etsy-mug", xml)
+
+	def test_store_links_drop_the_hosts_own_prefix(self):
+		from webshop.templates.pages.product_search import get_product_data
+		from webshop.webshop.product_data_engine.query import ProductQuery
+
+		frappe.db.set_value("Website Item", self.zx_item, "route", "zx/etsy-mug", update_modified=False)
+		on_host("zephyrex.test")
+		listing = {r["name"]: r["route"] for r in ProductQuery().query(fields={})["items"]}
+		self.assertEqual(listing[self.zx_item], "etsy-mug")
+		found = {r.item_code: r.route for r in get_product_data(search="_Test Item", limit=50)}
+		self.assertEqual(found["_Test Item"], "etsy-mug")
+		self.assertEqual(frappe.render_template("{{ public_route('/zx/etsy-mug') }}", {}), "/etsy-mug")
+		on_host("erp.example.test")
+		self.assertEqual(frappe.render_template("{{ public_route('/zx/etsy-mug') }}", {}), "/zx/etsy-mug")
+
 	def test_cart_quotation_uses_store_company(self):
 		from webshop.webshop.shopping_cart.cart import _get_cart_quotation
 

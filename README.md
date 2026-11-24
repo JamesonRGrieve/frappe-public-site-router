@@ -19,7 +19,8 @@ optional `/llms.txt` and Bing verification file, and a canonical link and `og:ur
 the site's canonical host (its first non-`www` domain).
 
 Analytics are per site too: Frappe's own page-view tracking (cookieless, each view stamped with its
-site), Google Analytics 4 (behind a consent banner: nothing reaches Google until the visitor accepts) and
+site), Google Analytics 4 (Consent Mode v2: denied by default in the EEA, UK, Switzerland and Quebec, granted
+elsewhere, with a banner to change it; it reports `generate_lead`, `click_to_call` and `click_email` conversions) and
 Matomo, in any combination, configured on the Public Site. A site can also
 give each browser an anonymous visitor ID (off by default; never under Do Not Track), so a lead form
 can link a visitor's earlier pages to their enquiry.

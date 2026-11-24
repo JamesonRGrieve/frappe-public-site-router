@@ -56,6 +56,7 @@ def update_website_context(context):
 		log_endpoint=LOG_ENDPOINT,
 		visitor_ids=bool(site.get("visitor_ids")),
 		privacy_url=privacy_url(site),
+		ga4_debug=bool(site.get("ga4_debug")),
 	)
 	chrome.add_head_html(context, snippets)
 

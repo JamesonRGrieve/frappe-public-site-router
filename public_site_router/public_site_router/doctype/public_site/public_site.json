@@ -37,6 +37,7 @@
   "view_tracking",
   "visitor_ids",
   "ga4_measurement_id",
+  "ga4_debug",
   "column_break_analytics",
   "matomo_url",
   "matomo_site_id",
@@ -232,10 +233,18 @@
    "label": "Visitor IDs"
   },
   {
-   "description": "Google Analytics 4 measurement ID (G-XXXXXXXXXX). Adds the Google tag to every page of this site.",
+   "description": "Google Analytics 4 measurement ID (G-XXXXXXXXXX). Adds the Google tag (Consent Mode v2: denied by default in the EEA, UK, Switzerland and Quebec, granted elsewhere) and reports generate_lead, click_to_call and click_email on every page of this site.",
    "fieldname": "ga4_measurement_id",
    "fieldtype": "Data",
    "label": "GA4 Measurement ID"
+  },
+  {
+   "default": "0",
+   "depends_on": "ga4_measurement_id",
+   "description": "Mark this site's GA4 events (generate_lead, click_to_call, click_email) for GA4's DebugView. Turn off after testing.",
+   "fieldname": "ga4_debug",
+   "fieldtype": "Check",
+   "label": "GA4 Debug Mode"
   },
   {
    "fieldname": "column_break_analytics",
@@ -276,7 +285,7 @@
   }
  ],
  "links": [],
- "modified": "2026-11-13 12:00:00.000000",
+ "modified": "2026-11-24 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Public Site Router",
  "name": "Public Site",

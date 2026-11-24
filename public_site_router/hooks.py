@@ -107,6 +107,8 @@ doc_events = {
 	},
 	"Builder Component": {"validate": "public_site_router.site_editors.validate_component"},
 	"Block Template": {"validate": "public_site_router.site_editors.validate_pattern"},
+	# A website lead (a site's Web Form → CRM Lead) is handed to the browser for GA4's generate_lead (site_conversions).
+	"CRM Lead": {"after_insert": "public_site_router.site_conversions.lead_after_insert"},
 }
 
 # Answers the frappe-webshop fork's multi-store hook: which Webshop Store serves this request.

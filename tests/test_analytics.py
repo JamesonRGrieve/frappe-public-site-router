@@ -7,7 +7,7 @@ import re
 
 import pytest
 
-from public_site_router import analytics
+from public_site_router import analytics, conversions
 
 ENDPOINT = "/api/method/public_site_router.site_analytics.log_view"
 
@@ -30,25 +30,77 @@ class TestGa4:
 		assert "https://www.googletagmanager.com/gtag/js?id='+ID" in snippet
 		assert "gtag('config',ID)" in snippet
 
-	def test_google_script_is_not_fetched_until_consent(self):
+	def test_google_script_loads_on_every_page(self):
+		# Consent Mode v2 decides what Google may store; the tag itself always loads (operator, 2026-11-24).
 		snippet = analytics.ga4_snippet("G-B30D03ZZWZ")
-		# No static tag: the script element is created only inside load(), after consent.
 		assert "<script async src=" not in snippet
-		load = snippet.index("function load()")
-		assert snippet.index("s.src='https://www.googletagmanager.com") > load
+		assert "function load()" not in snippet
+		assert snippet.index("s.src='https://www.googletagmanager.com") < snippet.index("function banner()")
 
-	def test_consent_mode_starts_denied(self):
+	def test_consent_defaults_are_regional(self):
 		snippet = analytics.ga4_snippet("G-B30D03ZZWZ")
-		default = snippet.index("gtag('consent','default'")
+		regional = snippet.index("gtag('consent','default'")
+		everywhere = snippet.index("gtag('consent','default'", regional + 1)
+		denied = snippet[regional:everywhere]
 		for signal in ("ad_storage", "ad_user_data", "ad_personalization", "analytics_storage"):
-			assert f"{signal}:'denied'" in snippet[default : default + 160]
-		assert "gtag('consent','update',{analytics_storage:'granted'})" in snippet
+			assert f"{signal}:'denied'" in denied
+			assert f"{signal}:'granted'" in snippet[everywhere : everywhere + 160]
+		assert f"wait_for_update:{analytics.CONSENT_WAIT_MS}" in denied
+		assert f"region:{json.dumps(list(analytics.CONSENT_REGIONS))}" in denied
+		# The region default comes first; both precede the tag's config.
+		assert everywhere < snippet.index("gtag('config',ID)")
+
+	def test_regions_match_the_wordpress_plugin(self):
+		eea = {
+			"AT",
+			"BE",
+			"BG",
+			"HR",
+			"CY",
+			"CZ",
+			"DK",
+			"EE",
+			"FI",
+			"FR",
+			"DE",
+			"GR",
+			"HU",
+			"IE",
+			"IT",
+			"LV",
+			"LT",
+		}
+		eea |= {"LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "IS", "LI", "NO"}
+		assert set(analytics.CONSENT_REGIONS) == eea | {"GB", "CH", "CA-QC"}
+		assert len(analytics.CONSENT_REGIONS) == len(set(analytics.CONSENT_REGIONS))
+
+	def test_a_stored_answer_applies_before_the_tag_configures(self):
+		snippet = analytics.ga4_snippet("G-B30D03ZZWZ")
+		applied = snippet.index(
+			"if(c==='granted')answer('granted');else if(c==='denied'||off)answer('denied');"
+		)
+		assert applied < snippet.index("gtag('config',ID)")
+		assert "gtag('consent','update',v==='granted'?{analytics_storage:'granted'}:" in snippet
 
 	def test_do_not_track_and_gpc_count_as_a_refusal(self):
 		snippet = analytics.ga4_snippet("G-B30D03ZZWZ")
-		assert (
-			"if(c==='denied'||navigator.globalPrivacyControl||navigator.doNotTrack==='1')return;" in snippet
-		)
+		assert "var off=!!(navigator.globalPrivacyControl||navigator.doNotTrack==='1');" in snippet
+		assert "if(c==='granted'||c==='denied'||off)return;" in snippet
+
+	def test_reports_the_plugins_conversion_events(self):
+		snippet = analytics.ga4_snippet("G-B30D03ZZWZ")
+		assert f"C={json.dumps(conversions.PENDING_COOKIE)}" in snippet
+		assert f"E={json.dumps(list(conversions.EVENTS))}" in snippet
+		assert "report('click_to_call',{link_url:h})" in snippet
+		assert "report('click_email',{})" in snippet  # never the address
+
+	def test_debug_mode_only_when_asked(self):
+		assert "D=false" in analytics.ga4_snippet("G-B30D03ZZWZ")
+		assert "D=true" in analytics.ga4_snippet("G-B30D03ZZWZ", debug=True)
+
+	def test_every_placeholder_is_filled(self):
+		snippet = analytics.ga4_snippet("G-B30D03ZZWZ", "/privacy", debug=True)
+		assert not re.search(r"@[A-Z]+@", snippet)
 
 	def test_banner_links_the_privacy_page_when_given(self):
 		assert 'P="/privacy"' in analytics.ga4_snippet("G-B30D03ZZWZ", "/privacy")
@@ -176,6 +228,10 @@ class TestHeadSnippets:
 	def test_every_configured_provider(self):
 		html = self.snippets()
 		assert ENDPOINT in html and "G-B30D03ZZWZ" in html and "matomo.php" in html
+
+	def test_ga4_debug_reaches_the_snippet(self):
+		assert "D=false" in self.snippets()
+		assert "D=true" in self.snippets(ga4_debug=True)
 
 	def test_visitor_ids_only_when_enabled(self):
 		assert "psr_vid" not in self.snippets()

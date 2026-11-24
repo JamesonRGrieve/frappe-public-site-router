@@ -149,13 +149,25 @@ Per Public Site, any combination of providers, each added to every page of that 
     visitors never get one; no cookie) and sends it; `log_view` stores it in `Web Page View.visitor_id`
     only on such a site. A lead form reads the same key so a CRM app (e.g. frappe-crm-heat-tracking)
     can link the visitor's pages to the lead.
-- **Google Analytics 4** (`ga4_measurement_id`, validated `G-…`): the Google tag **behind a consent
-  banner**. Consent Mode v2 defaults every signal to denied, and `gtag.js` is fetched only after the
-  visitor accepts, so nothing reaches Google before that. The choice is kept in
-  `localStorage["psr_consent"]`; Do Not Track / Global Privacy Control count as a refusal (no banner);
-  any element with `data-psr-consent-reset` (e.g. on the privacy page) clears it. The banner (bottom,
-  `.psr-consent`, restylable) links the site's `privacy_route` when set. Values are embedded with
-  `analytics.js_string` (JSON with `<` escaped), so no field can close the script.
+- **Google Analytics 4** (`ga4_measurement_id`, validated `G-…`): the Google tag on every page with **Consent Mode v2
+  region defaults**, the same as OMG's wp-conversion-tracking WordPress plugin (operator, 2026-11-24): every signal
+  denied in the EEA, the UK, Switzerland and Quebec (`CONSENT_REGIONS`, `wait_for_update` 500 ms), granted elsewhere.
+  `gtag.js` always loads, so a visitor whose consent is denied still sends Google's cookieless pings. A stored answer
+  (`localStorage["psr_consent"]`) is applied before the tag configures; Do Not Track / Global Privacy Control count as
+  a refusal (every signal denied, no banner). Visitors without an answer see the banner (bottom, `.psr-consent`,
+  restylable, linking the site's `privacy_route` when set): Accept grants analytics storage, Decline denies every
+  signal. Any element with `data-psr-consent-reset` (e.g. on the privacy page) clears the answer. Values are embedded
+  with `analytics.js_string` (JSON with `<` escaped), so no field can close the script. **A site turning GA4 on needs
+  a line about Google Analytics on its privacy page.**
+- **Conversions** (`conversions.py` pure, `site_conversions.py` Frappe; with GA4 on): the plugin's event names, so one
+  set of GA4 key events covers WordPress and Frappe sites.
+  - `generate_lead`: counted on the server, never on a click. A CRM Lead `after_insert` (doc_events) with
+    `public_site` set, `source` "Website", created by a site's Web Form (`form_dict.web_form`) on a host of that same
+    site, sets the `psr_pending` cookie (the hook never raises: a failure is logged as "public_site_router: generate_lead cookie" and the lead is kept) (base64url JSON list of `{e, p}`, 10 min, not HttpOnly, newest 5). The tag's
+    script reads and clears it on load, on pageshow/visibility and after every fetch/XHR response, and reports it once
+    with `form_id` / `form_name`. Not counted: `waitlist-*` forms (sent server to server) and `@example.com` test leads.
+  - `click_to_call` (with `link_url`) and `click_email` (no address) on `tel:` / `mailto:` link clicks.
+  - `ga4_debug` (Check) marks every event `debug_mode` for GA4's DebugView; turn it off after testing.
 - **Matomo** (`matomo_url` https + `matomo_site_id` numeric): the standard tracker, **cookieless until the
   visitor accepts the banner**. `requireCookieConsent` counts every visit without cookies (and clears `_pk_*` cookies
   set before); a stored `granted` choice, or the banner's Accept on the same page (the `psr-consent` event the banner

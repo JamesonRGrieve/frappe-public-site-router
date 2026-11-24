@@ -13,6 +13,8 @@ import json
 import re
 from urllib.parse import urlsplit
 
+from public_site_router import conversions
+
 GA4_ID = re.compile(r"^G-[A-Z0-9]{4,20}$")
 MATOMO_SITE_ID = re.compile(r"^[0-9]{1,9}$")
 # Paths that are never page views: the API, the desk and files.
@@ -25,13 +27,21 @@ UTM_FIELDS = ("source", "medium", "campaign", "content")
 # UUID without dashes. Other apps (a lead form) read it from the same key.
 VISITOR_STORAGE_KEY = "psr_vid"
 VISITOR_ID = re.compile(r"^[0-9a-f]{32}$")
-# A visitor's analytics cookie choice ("granted" / "denied") in localStorage under this key. It covers Google Analytics
-# (loaded only once granted) and Matomo's cookies (Matomo itself counts without cookies until then).
+# A visitor's analytics cookie choice ("granted" / "denied") in localStorage under this key. It covers Google Analytics'
+# consent signals (on top of the region defaults) and Matomo's cookies (Matomo itself counts without cookies until then).
 CONSENT_STORAGE_KEY = "psr_consent"
 # Fired on document when the visitor answers the banner (detail: "granted" / "denied"), so Matomo can start using
 # cookies on the same page.
 CONSENT_EVENT = "psr-consent"
 CONSENT_TEXT = "Analytics cookies, to see which pages help? No ads."
+# Consent Mode v2 defaults, the same as OMG's wp-conversion-tracking plugin (operator, 2026-11-24): every signal
+# denied in the EEA, the UK, Switzerland and Quebec, granted elsewhere. Google resolves the visitor's region, so the
+# defaults are safe in cached HTML.
+CONSENT_REGIONS = (
+	"AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV", "LT",
+	"LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "IS", "LI", "NO", "GB", "CH", "CA-QC",
+)  # fmt: skip
+CONSENT_WAIT_MS = 500
 # The banner never covers a site's first screen: a compact card in the bottom-right corner on wider screens, and on
 # phones one slim full-width bar along the bottom (one or two short lines and two small buttons, ~64 px). A larger
 # card covered about a fifth of a phone's first screen, hiding heroes and calls to action (audit design notes,
@@ -54,6 +64,68 @@ CONSENT_CSS = (
 	"padding:.45rem .6rem calc(.45rem + env(safe-area-inset-bottom));border-width:1px 0 0;border-radius:0;"
 	"box-shadow:0 -2px 12px rgba(0,0,0,.12);font-size:13px;line-height:1.3}"
 	".psr-consent p{flex:1 1 auto}.psr-consent button{min-height:34px;padding:.3rem .6rem;font-size:13px}}"
+)
+
+
+# The Google tag's script (``ga4_snippet`` fills the @…@ values). Consent defaults come first, then the visitor's stored
+# answer, then the tag: Google applies the most specific default (the region one) to each visitor. Conversions: a lead
+# the server confirmed arrives in a short-lived cookie (base64url JSON list of {e: event, p: params}, the plugin's
+# wct_pending format); it is read and cleared on load, on pageshow/visibility and after every fetch/XHR response
+# (the Web Form's own submission sets it), so each lead is reported once. Phone and email link clicks are reported as
+# they happen; an email address is never sent.
+GA4_JS = "".join(
+	(
+		"window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}",
+		"gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',",
+		"analytics_storage:'denied',wait_for_update:@WAIT@,region:@REGIONS@});",
+		"gtag('consent','default',{ad_storage:'granted',ad_user_data:'granted',ad_personalization:'granted',",
+		"analytics_storage:'granted'});",
+		"(function(){var K=@KEY@,ID=@ID@,P=@PRIVACY@,T=@TEXT@,C=@COOKIE@,E=@EVENTS@,D=@DEBUG@;",
+		"function store(v){try{localStorage.setItem(K,v)}catch(e){}}",
+		"function answer(v){gtag('consent','update',v==='granted'?{analytics_storage:'granted'}:",
+		"{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied'});}",
+		"var c=null;try{c=localStorage.getItem(K)}catch(e){}",
+		"var off=!!(navigator.globalPrivacyControl||navigator.doNotTrack==='1');",
+		"if(c==='granted')answer('granted');else if(c==='denied'||off)answer('denied');",
+		"var s=document.createElement('script');s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id='+ID;",
+		"document.head.appendChild(s);gtag('js',new Date());gtag('config',ID);",
+		"function report(n,p){if(E.indexOf(n)<0)return;var q={};for(var k in p)",
+		"if(Object.prototype.hasOwnProperty.call(p,k))q[k]=p[k];if(D)q.debug_mode=true;gtag('event',n,q);}",
+		"function cookie(){var a=document.cookie?document.cookie.split('; '):[];for(var i=0;i<a.length;i++){",
+		"var j=a[i].indexOf('=');if(a[i].slice(0,j)===C)return a[i].slice(j+1);}return null;}",
+		"function decode(v){try{var b=v.replace(/-/g,'+').replace(/_/g,'/');while(b.length%4)b+='=';",
+		"var r=atob(b),u=new Uint8Array(r.length);for(var i=0;i<r.length;i++)u[i]=r.charCodeAt(i);",
+		"var l=JSON.parse(new TextDecoder('utf-8').decode(u));return Array.isArray(l)?l:[];}catch(e){return[];}}",
+		"function drain(){var v=cookie();if(!v)return;",
+		"document.cookie=C+'=; Max-Age=0; Path=/; SameSite=Lax'+(location.protocol==='https:'?'; Secure':'');",
+		"decode(v).forEach(function(x){if(x&&typeof x.e==='string')report(x.e,x.p&&typeof x.p==='object'?x.p:{});});}",
+		"if(window.fetch){var f=window.fetch;window.fetch=function(){return f.apply(this,arguments).then(",
+		"function(r){setTimeout(drain,0);return r;});};}",
+		"if(window.XMLHttpRequest){var xs=XMLHttpRequest.prototype.send;XMLHttpRequest.prototype.send=function(){",
+		"this.addEventListener('loadend',function(){setTimeout(drain,0);});return xs.apply(this,arguments);};}",
+		"window.addEventListener('pageshow',drain);",
+		"document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')drain();});",
+		"document.addEventListener('click',function(e){var t=e.target;",
+		"var r=t.closest&&t.closest('[data-psr-consent-reset]');",
+		"if(r){e.preventDefault();try{localStorage.removeItem(K)}catch(x){}location.reload();return;}",
+		"var a=t.closest&&t.closest('a[href]');if(!a)return;var h=(a.getAttribute('href')||'').trim().toLowerCase();",
+		"if(h.indexOf('tel:')===0)report('click_to_call',{link_url:h});",
+		"else if(h.indexOf('mailto:')===0)report('click_email',{});},true);",
+		"drain();",
+		"if(c==='granted'||c==='denied'||off)return;",
+		"function banner(){var st=document.createElement('style');st.textContent=@CSS@;",
+		"document.head.appendChild(st);var b=document.createElement('div');b.className='psr-consent';",
+		"b.setAttribute('role','region');b.setAttribute('aria-label','Cookie consent');",
+		"var p=document.createElement('p');p.textContent=T+' ';",
+		"if(P){var a=document.createElement('a');a.href=P;a.textContent='Privacy';p.appendChild(a);}",
+		"var w=document.createElement('div');w.className='psr-consent__actions';",
+		"function btn(t,v){var x=document.createElement('button');x.type='button';x.textContent=t;",
+		"x.dataset.choice=v;x.addEventListener('click',function(){store(v);b.remove();answer(v);",
+		"document.dispatchEvent(new CustomEvent(@EVENT@,{detail:v}));});w.appendChild(x);}",
+		"btn('Decline','denied');btn('Accept','granted');b.appendChild(p);b.appendChild(w);document.body.appendChild(b);}",
+		"if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',banner);else banner();",
+		"})();",
+	)
 )
 
 
@@ -86,41 +158,38 @@ def valid_matomo_site_id(value: str) -> bool:
 	return bool(MATOMO_SITE_ID.match(value or ""))
 
 
-def ga4_snippet(measurement_id: str, privacy_url: str = "") -> str:
-	"""The Google tag behind a consent banner. Consent Mode v2 starts with everything denied, and Google's
-	script is fetched only once the visitor accepts, so nothing reaches Google before that. The choice is kept
-	in ``localStorage[CONSENT_STORAGE_KEY]``; Do Not Track / Global Privacy Control count as a refusal (no
-	banner). Any element with ``data-psr-consent-reset`` (e.g. on the privacy page) clears the choice."""
+def ga4_snippet(measurement_id: str, privacy_url: str = "", debug: bool = False) -> str:
+	"""The Google tag with Consent Mode v2 region defaults (the same as OMG's wp-conversion-tracking plugin):
+	every signal denied in ``CONSENT_REGIONS`` (waiting ``CONSENT_WAIT_MS`` for an answer), granted elsewhere.
+	``gtag.js`` loads on every page, so a visitor whose consent is denied still sends Google's cookieless pings.
+
+	A stored banner answer (``localStorage[CONSENT_STORAGE_KEY]``) is applied before the tag configures; Do Not
+	Track / Global Privacy Control count as a refusal (every signal denied, no banner). Visitors without an answer
+	see the banner: Accept grants analytics storage, Decline denies every signal. Any element with
+	``data-psr-consent-reset`` (e.g. on the privacy page) clears the answer.
+
+	It also reports conversions with the plugin's event names: ``generate_lead`` for each lead the server confirmed
+	(handed over in the ``conversions.PENDING_COOKIE`` cookie and reported once), ``click_to_call`` and
+	``click_email`` for phone and email links. ``debug`` marks every event for GA4's DebugView."""
 	if not valid_ga4_id(measurement_id):
 		raise ValueError(f"not a GA4 measurement ID: {measurement_id!r}")
-	key, gid, event = json.dumps(CONSENT_STORAGE_KEY), json.dumps(measurement_id), json.dumps(CONSENT_EVENT)
+	values = {
+		"@KEY@": json.dumps(CONSENT_STORAGE_KEY),
+		"@ID@": json.dumps(measurement_id),
+		"@PRIVACY@": js_string(privacy_url),
+		"@TEXT@": js_string(CONSENT_TEXT),
+		"@CSS@": js_string(CONSENT_CSS),
+		"@EVENT@": json.dumps(CONSENT_EVENT),
+		"@REGIONS@": json.dumps(list(CONSENT_REGIONS)),
+		"@WAIT@": str(CONSENT_WAIT_MS),
+		"@COOKIE@": json.dumps(conversions.PENDING_COOKIE),
+		"@EVENTS@": json.dumps(list(conversions.EVENTS)),
+		"@DEBUG@": "true" if debug else "false",
+	}
 	return (
-		"<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}"
-		"gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',"
-		"analytics_storage:'denied'});"
-		f"(function(){{var K={key},ID={gid},P={js_string(privacy_url)},T={js_string(CONSENT_TEXT)};"
-		"function store(v){try{localStorage.setItem(K,v)}catch(e){}}"
-		"function load(){gtag('consent','update',{analytics_storage:'granted'});var s=document.createElement('script');"
-		"s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id='+ID;document.head.appendChild(s);"
-		"gtag('js',new Date());gtag('config',ID);}"
-		"document.addEventListener('click',function(e){var r=e.target.closest&&e.target.closest('[data-psr-consent-reset]');"
-		"if(r){e.preventDefault();try{localStorage.removeItem(K)}catch(x){}location.reload();}});"
-		"var c=null;try{c=localStorage.getItem(K)}catch(e){}"
-		"if(c==='granted'){load();return;}"
-		"if(c==='denied'||navigator.globalPrivacyControl||navigator.doNotTrack==='1')return;"
-		f"function banner(){{var st=document.createElement('style');st.textContent={js_string(CONSENT_CSS)};"
-		"document.head.appendChild(st);var b=document.createElement('div');b.className='psr-consent';"
-		"b.setAttribute('role','region');b.setAttribute('aria-label','Cookie consent');"
-		"var p=document.createElement('p');p.textContent=T+' ';"
-		"if(P){var a=document.createElement('a');a.href=P;a.textContent='Privacy';p.appendChild(a);}"
-		"var w=document.createElement('div');w.className='psr-consent__actions';"
-		"function btn(t,v){var x=document.createElement('button');x.type='button';x.textContent=t;"
-		"x.dataset.choice=v;x.addEventListener('click',function(){store(v);b.remove();if(v==='granted')load();"
-		f"document.dispatchEvent(new CustomEvent({event},{{detail:v}}));}});"
-		"w.appendChild(x);}"
-		"btn('Decline','denied');btn('Accept','granted');b.appendChild(p);b.appendChild(w);document.body.appendChild(b);}"
-		"if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',banner);else banner();"
-		"})();</script>"
+		"<script>"
+		+ re.sub("|".join(map(re.escape, values)), lambda m: values[m.group(0)], GA4_JS)
+		+ "</script>"
 	)
 
 
@@ -185,6 +254,7 @@ def head_snippets(
 	log_endpoint: str,
 	visitor_ids: bool = False,
 	privacy_url: str = "",
+	ga4_debug: bool = False,
 ) -> str:
 	"""Every configured provider's snippet for one site. A half-configured or invalid provider adds
 	nothing (Public Site validation rejects those values on save)."""
@@ -192,7 +262,7 @@ def head_snippets(
 	if view_tracking:
 		snippets.append(view_tracker_snippet(log_endpoint, visitor_ids))
 	if valid_ga4_id(ga4_measurement_id):
-		snippets.append(ga4_snippet(ga4_measurement_id, privacy_url))
+		snippets.append(ga4_snippet(ga4_measurement_id, privacy_url, ga4_debug))
 	if matomo_base(matomo_url) and valid_matomo_site_id(matomo_site_id):
 		snippets.append(matomo_snippet(matomo_url, matomo_site_id))
 	return "".join(snippets)
